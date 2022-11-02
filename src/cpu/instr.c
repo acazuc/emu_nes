@@ -421,7 +421,9 @@ static void exec_brk(cpu_t *cpu)
 	mem_set(cpu->mem, 0x100 + cpu->regs.s--, cpu->regs.pc >> 0);
 	mem_set(cpu->mem, 0x100 + cpu->regs.s--, cpu->regs.p);
 	CPU_SET_FLAG_I(cpu, 1);
-	cpu->regs.pc = 0xFFFE;
+	uint16_t lo = mem_get(cpu->mem, 0xFFFE);
+	uint16_t hi = mem_get(cpu->mem, 0xFFFF);
+	cpu->regs.pc = lo | (hi << 8);
 }
 
 static void print_brk(cpu_t *cpu, char *data, size_t size)
@@ -1143,7 +1145,9 @@ static void exec_irq(cpu_t *cpu)
 	mem_set(cpu->mem, cpu->regs.s--, pc >> 0);
 	mem_set(cpu->mem, cpu->regs.s--, cpu->regs.p);
 	CPU_SET_FLAG_I(cpu, 1);
-	cpu->regs.pc = 0xFFFE;
+	uint16_t lo = mem_get(cpu->mem, 0xFFFE);
+	uint16_t hi = mem_get(cpu->mem, 0xFFFF);
+	cpu->regs.pc = lo | (hi << 8);
 }
 
 static void print_irq(cpu_t *cpu, char *data, size_t size)
@@ -1166,7 +1170,9 @@ static void exec_nmi(cpu_t *cpu)
 	mem_set(cpu->mem, cpu->regs.s--, pc >> 0);
 	mem_set(cpu->mem, cpu->regs.s--, cpu->regs.p);
 	CPU_SET_FLAG_I(cpu, 1);
-	cpu->regs.pc = 0xFFFA;
+	uint16_t lo = mem_get(cpu->mem, 0xFFFA);
+	uint16_t hi = mem_get(cpu->mem, 0xFFFB);
+	cpu->regs.pc = lo | (hi << 8);
 }
 
 static void print_nmi(cpu_t *cpu, char *data, size_t size)
@@ -1186,7 +1192,9 @@ static void exec_reset(cpu_t *cpu)
 	CPU_SET_FLAG_B(cpu, 1);
 	cpu->regs.s -= 3;
 	CPU_SET_FLAG_I(cpu, 1);
-	cpu->regs.pc = 0xFFFC;
+	uint16_t lo = mem_get(cpu->mem, 0xFFFC);
+	uint16_t hi = mem_get(cpu->mem, 0xFFFD);
+	cpu->regs.pc = lo | (hi << 8);
 }
 
 static void print_reset(cpu_t *cpu, char *data, size_t size)
