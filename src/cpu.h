@@ -58,6 +58,7 @@ typedef struct cpu
 	mem_t *mem;
 	uint8_t clock_count;
 	uint8_t instr_delay;
+	char nmi;
 } cpu_t;
 
 cpu_t *cpu_new(mem_t *mem);
@@ -68,5 +69,7 @@ uint8_t cpu_peek8(cpu_t *cpu);
 uint16_t cpu_peek16(cpu_t *cpu);
 uint8_t cpu_fetch8(cpu_t *cpu);
 uint16_t cpu_fetch16(cpu_t *cpu);
+
+void cpu_nmi(cpu_t *cpu);
 
 #endif

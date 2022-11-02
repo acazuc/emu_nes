@@ -57,20 +57,30 @@ static void cpu_cycle(cpu_t *cpu)
 	{
 		/* XXX IRQ */
 	}
-	/* XXX NMI */
-	uint8_t opc = cpu_fetch8(cpu);
-	const cpu_instr_t *instr = cpu_instr[opc];
-	if (!instr)
+	const cpu_instr_t *instr;
+	uint8_t opc;
+	if (cpu->nmi)
 	{
-		printf("unknown instruction %" PRIx8 "\n", opc);
-		return;
+		instr = &instr_nmi;
+		cpu->nmi = 0;
+		opc = 0;
+	}
+	else
+	{
+		opc = cpu_fetch8(cpu);
+		instr = cpu_instr[opc];
+		if (!instr)
+		{
+			printf("unknown instruction %" PRIx8 "\n", opc);
+			return;
+		}
 	}
 	char tmp[256];
 	instr->print(cpu, tmp, sizeof(tmp));
-	printf("%-20s [OPC=%02" PRIx8 " A=%02" PRIx8 " X=%02" PRIx8 " Y=%02" PRIx8
+	printf("%-20s [OP=%02" PRIx8 " A=%02" PRIx8 " X=%02" PRIx8 " Y=%02" PRIx8
 	       " S=%02" PRIx8 " PC=%04" PRIx16 " P=%02" PRIx8 "]\n",
 	       tmp, opc, cpu->regs.a, cpu->regs.x, cpu->regs.y, cpu->regs.s,
-	       cpu->regs.pc, cpu->regs.p);
+	       cpu->regs.pc - 1, cpu->regs.p);
 	instr->exec(cpu);
 }
 
@@ -81,4 +91,9 @@ void cpu_clock(cpu_t *cpu)
 		cpu_cycle(cpu);
 		cpu->clock_count = 0;
 	}
+}
+
+void cpu_nmi(cpu_t *cpu)
+{
+	cpu->nmi = 1;
 }

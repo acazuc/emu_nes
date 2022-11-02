@@ -3,6 +3,7 @@
 #include "../mem.h"
 #include <inttypes.h>
 #include <string.h>
+#include <stdlib.h>
 #include <stdio.h>
 
 #define CPU_INSTR(name) \
@@ -200,6 +201,25 @@ LDR_IND16_R(a, y);
 LDR_IND16_R(x, y);
 LDR_IND16_R(y, x);
 
+#define LDR_IND8(r) \
+static void exec_ld##r##_ind8(cpu_t *cpu) \
+{ \
+	uint8_t ind = cpu_fetch8(cpu); \
+	cpu->regs.r = mem_get(cpu->mem, ind); \
+	CPU_SET_FLAG_Z(cpu, !cpu->regs.r); \
+	CPU_SET_FLAG_N(cpu, cpu->regs.r & 0x80); \
+} \
+static void print_ld##r##_ind8(cpu_t *cpu, char *data, size_t size) \
+{ \
+	uint8_t ind = cpu_peek8(cpu); \
+	snprintf(data, size, "ld" #r " $%02" PRIx8, ind); \
+} \
+CPU_INSTR(ld##r##_ind8)
+
+LDR_IND8(a);
+LDR_IND8(x);
+LDR_IND8(y);
+
 #define LDR_IND16(r) \
 static void exec_ld##r##_ind16(cpu_t *cpu) \
 { \
@@ -243,7 +263,7 @@ static void exec_##name(cpu_t *cpu) \
 { \
 	int8_t dd = cpu_fetch8(cpu); \
 	if (CPU_GET_FLAG(cpu, CPU_FLAG_##flag) == v) \
-		cpu->regs.pc += dd; \
+		cpu->regs.pc = (cpu->regs.pc & 0xFF00) | ((cpu->regs.pc + dd) & 0xFF); \
 } \
 static void print_##name(cpu_t *cpu, char *data, size_t size) \
 { \
@@ -424,6 +444,77 @@ static void print_nop(cpu_t *cpu, char *data, size_t size)
 }
 
 CPU_INSTR(nop);
+
+static void exec_nop_imm(cpu_t *cpu)
+{
+	uint8_t imm = cpu_fetch8(cpu);
+	(void)imm;
+}
+
+static void print_nop_imm(cpu_t *cpu, char *data, size_t size)
+{
+	uint8_t imm = cpu_peek8(cpu);
+	snprintf(data, size, "nop #$%02" PRIx8, imm);
+	(void)imm;
+}
+
+CPU_INSTR(nop_imm);
+
+static void exec_nop_ind8(cpu_t *cpu)
+{
+	uint8_t ind = cpu_fetch8(cpu);
+	(void)ind;
+}
+
+static void print_nop_ind8(cpu_t *cpu, char *data, size_t size)
+{
+	uint8_t ind = cpu_peek8(cpu);
+	snprintf(data, size, "nop $%02" PRIx8, ind);
+}
+
+CPU_INSTR(nop_ind8);
+
+static void exec_nop_ind16(cpu_t *cpu)
+{
+	uint16_t ind = cpu_fetch16(cpu);
+	(void)ind;
+}
+
+static void print_nop_ind16(cpu_t *cpu, char *data, size_t size)
+{
+	uint16_t ind = cpu_peek16(cpu);
+	snprintf(data, size, "nop $%04" PRIx16, ind);
+}
+
+CPU_INSTR(nop_ind16);
+
+static void exec_nop_ind8_x(cpu_t *cpu)
+{
+	uint8_t ind = cpu_fetch8(cpu);
+	(void)ind;
+}
+
+static void print_nop_ind8_x(cpu_t *cpu, char *data, size_t size)
+{
+	uint8_t ind = cpu_peek8(cpu);
+	snprintf(data, size, "nop $%02" PRIx8 ", x", ind);
+}
+
+CPU_INSTR(nop_ind8_x);
+
+static void exec_nop_ind16_x(cpu_t *cpu)
+{
+	uint16_t ind = cpu_fetch16(cpu);
+	(void)ind;
+}
+
+static void print_nop_ind16_x(cpu_t *cpu, char *data, size_t size)
+{
+	uint16_t ind = cpu_peek16(cpu);
+	snprintf(data, size, "nop $%04" PRIx16 ", x", ind);
+}
+
+CPU_INSTR(nop_ind16_x);
 
 static void exec_lda_ind_x(cpu_t *cpu)
 {
@@ -1004,7 +1095,7 @@ static void exec_##op##_ind_x(cpu_t *cpu) \
 static void print_##op##_ind_x(cpu_t *cpu, char *data, size_t size) \
 { \
 	uint8_t ind = cpu_peek8(cpu); \
-	snprintf(data, size, #op "($%02" PRIx8 ", x)", ind); \
+	snprintf(data, size, #op " ($%02" PRIx8 ", x)", ind); \
 } \
 CPU_INSTR(op##_ind_x); \
 static void exec_##op##_ind_y(cpu_t *cpu) \
@@ -1019,7 +1110,7 @@ static void exec_##op##_ind_y(cpu_t *cpu) \
 static void print_##op##_ind_y(cpu_t *cpu, char *data, size_t size) \
 { \
 	uint8_t ind = cpu_peek8(cpu); \
-	snprintf(data, size, #op "($%02" PRIx8 "), y", ind); \
+	snprintf(data, size, #op " ($%02" PRIx8 "), y", ind); \
 } \
 CPU_INSTR(op##_ind_y)
 
@@ -1028,6 +1119,21 @@ ALU(sbc);
 ALU(and);
 ALU(eor);
 ALU(ora);
+
+static void exec_kil(cpu_t *cpu)
+{
+	(void)cpu;
+	/* XXX */
+	abort();
+}
+
+static void print_kil(cpu_t *cpu, char *data, size_t size)
+{
+	(void)cpu;
+	snprintf(data, size, "kil");
+}
+
+CPU_INSTR(kil);
 
 static void exec_irq(cpu_t *cpu)
 {
@@ -1046,7 +1152,7 @@ static void print_irq(cpu_t *cpu, char *data, size_t size)
 	snprintf(data, size, "irq");
 }
 
-const cpu_instr_t irq_instr =
+const cpu_instr_t instr_irq =
 {
 	.exec = exec_irq,
 	.print = print_irq,
@@ -1069,7 +1175,7 @@ static void print_nmi(cpu_t *cpu, char *data, size_t size)
 	snprintf(data, size, "nmi");
 }
 
-const cpu_instr_t nmi_instr =
+const cpu_instr_t instr_nmi =
 {
 	.exec = exec_nmi,
 	.print = print_nmi,
@@ -1089,7 +1195,7 @@ static void print_reset(cpu_t *cpu, char *data, size_t size)
 	snprintf(data, size, "reset");
 }
 
-const cpu_instr_t reset_instr =
+const cpu_instr_t instr_reset =
 {
 	.exec = exec_reset,
 	.print = print_reset,
@@ -1097,152 +1203,68 @@ const cpu_instr_t reset_instr =
 
 const cpu_instr_t *cpu_instr[256] =
 {
-	[0x00] = &instr_brk,
-	[0x01] = &instr_ora_ind_x,
-	[0x05] = &instr_ora_ind8,
-	[0x06] = &instr_asl_ind8,
-	[0x08] = &instr_php,
-	[0x09] = &instr_ora_imm,
-	[0x0A] = &instr_asl_a,
-	[0x0D] = &instr_ora_ind16,
-	[0x0E] = &instr_asl_ind16,
-	[0x10] = &instr_bpl,
-	[0x11] = &instr_ora_ind_y,
-	[0x15] = &instr_ora_ind8_x,
-	[0x16] = &instr_asl_ind8_x,
-	[0x18] = &instr_clc,
-	[0x19] = &instr_ora_ind16_y,
-	[0x1D] = &instr_ora_ind16_x,
-	[0x1E] = &instr_asl_ind16_x,
-	[0x20] = &instr_jsr,
-	[0x21] = &instr_and_ind_x,
-	[0x24] = &instr_bit_ind8,
-	[0x25] = &instr_and_ind8,
-	[0x26] = &instr_rol_ind8,
-	[0x28] = &instr_plp,
-	[0x29] = &instr_and_imm,
-	[0x2A] = &instr_rol_a,
-	[0x2C] = &instr_bit_ind16,
-	[0x2D] = &instr_and_ind16,
-	[0x2E] = &instr_rol_ind16,
-	[0x30] = &instr_bmi,
-	[0x31] = &instr_and_ind_y,
-	[0x35] = &instr_and_ind8_x,
-	[0x36] = &instr_rol_ind8_x,
-	[0x38] = &instr_sec,
-	[0x39] = &instr_and_ind16_y,
-	[0x3D] = &instr_and_ind16_x,
-	[0x3E] = &instr_rol_ind16_x,
-	[0x40] = &instr_rti,
-	[0x41] = &instr_eor_ind_x,
-	[0x45] = &instr_eor_ind8,
-	[0x46] = &instr_lsr_ind8,
-	[0x48] = &instr_pha,
-	[0x49] = &instr_eor_imm,
-	[0x4A] = &instr_lsr_a,
-	[0x4C] = &instr_jmp_imm,
-	[0x4D] = &instr_eor_ind16,
-	[0x4E] = &instr_lsr_ind16,
-	[0x50] = &instr_bvc,
-	[0x51] = &instr_eor_ind_y,
-	[0x55] = &instr_eor_ind8_x,
-	[0x56] = &instr_lsr_ind8_x,
-	[0x58] = &instr_cli,
-	[0x59] = &instr_eor_ind16_y,
-	[0x5D] = &instr_eor_ind16_x,
-	[0x5E] = &instr_lsr_ind16_x,
-	[0x60] = &instr_rts,
-	[0x61] = &instr_adc_ind_x,
-	[0x65] = &instr_adc_ind8,
-	[0x66] = &instr_ror_ind8,
-	[0x68] = &instr_pla,
-	[0x69] = &instr_adc_imm,
-	[0x6A] = &instr_ror_a,
-	[0x6C] = &instr_jmp_ind,
-	[0x6D] = &instr_adc_ind16,
-	[0x6E] = &instr_ror_ind16,
-	[0x70] = &instr_bvs,
-	[0x71] = &instr_adc_ind_y,
-	[0x75] = &instr_adc_ind8_x,
-	[0x76] = &instr_ror_ind8_x,
-	[0x78] = &instr_sei,
-	[0x79] = &instr_adc_ind16_y,
-	[0x7D] = &instr_adc_ind16_x,
-	[0x7E] = &instr_ror_ind16_x,
-	[0x81] = &instr_sta_ind_x,
-	[0x84] = &instr_sty_ind8,
-	[0x85] = &instr_sta_ind8,
-	[0x86] = &instr_stx_ind8,
-	[0x88] = &instr_dey,
-	[0x8A] = &instr_txa,
-	[0x8C] = &instr_sty_ind16,
-	[0x8D] = &instr_sta_ind16,
-	[0x8E] = &instr_stx_ind16,
-	[0x90] = &instr_bcc,
-	[0x91] = &instr_sta_ind_y,
-	[0x94] = &instr_sty_ind8_x,
-	[0x95] = &instr_sta_ind8_x,
-	[0x96] = &instr_stx_ind8_y,
-	[0x98] = &instr_tya,
-	[0x99] = &instr_sta_ind16_y,
-	[0x9A] = &instr_txs,
-	[0x9D] = &instr_sta_ind16_x,
-	[0xA0] = &instr_ldy_imm,
-	[0xA1] = &instr_lda_ind_x,
-	[0xA2] = &instr_ldx_imm,
-	[0xA8] = &instr_tay,
-	[0xA9] = &instr_lda_imm,
-	[0xAA] = &instr_tax,
-	[0xAC] = &instr_ldy_ind16,
-	[0xAD] = &instr_lda_ind16,
-	[0xAE] = &instr_ldx_ind16,
-	[0xB0] = &instr_bcs,
-	[0xB1] = &instr_lda_ind_y,
-	[0xB4] = &instr_ldy_ind8_x,
-	[0xB5] = &instr_lda_ind8_x,
-	[0xB6] = &instr_ldx_ind8_y,
-	[0xB8] = &instr_clv,
-	[0xB9] = &instr_lda_ind16_y,
-	[0xBA] = &instr_tsx,
-	[0xBC] = &instr_ldy_ind16_x,
-	[0xBD] = &instr_lda_ind16_x,
-	[0xBE] = &instr_ldx_ind16_y,
-	[0xC0] = &instr_cpy_imm,
-	[0xC1] = &instr_cmp_ind_x,
-	[0xC4] = &instr_cpy_ind8,
-	[0xC5] = &instr_cmp_ind8,
-	[0xC6] = &instr_dec_ind8,
-	[0xC8] = &instr_iny,
-	[0xC9] = &instr_cmp_imm,
-	[0xCA] = &instr_dex,
-	[0xCC] = &instr_cpy_ind16,
-	[0xCD] = &instr_cmp_ind16,
-	[0xCE] = &instr_dec_ind16,
-	[0xD0] = &instr_bne,
-	[0xD1] = &instr_cmp_ind_y,
-	[0xD5] = &instr_cmp_ind8_x,
-	[0xD6] = &instr_dec_ind8_x,
-	[0xD8] = &instr_cld,
-	[0xD9] = &instr_cmp_ind16_y,
-	[0xDD] = &instr_cmp_ind16_x,
-	[0xDE] = &instr_dec_ind16_x,
-	[0xE0] = &instr_cpx_imm,
-	[0xE1] = &instr_sbc_ind_x,
-	[0xE4] = &instr_cpx_ind8,
-	[0xE5] = &instr_sbc_ind8,
-	[0xE6] = &instr_inc_ind8,
-	[0xE8] = &instr_inx,
-	[0xE9] = &instr_sbc_imm,
-	[0xEC] = &instr_cpx_ind16,
-	[0xED] = &instr_sbc_ind16,
-	[0xEE] = &instr_inc_ind16,
-	[0xEA] = &instr_nop,
-	[0xF0] = &instr_beq,
-	[0xF1] = &instr_sbc_ind_y,
-	[0xF5] = &instr_sbc_ind8_x,
-	[0xF6] = &instr_inc_ind8_x,
-	[0xF8] = &instr_sed,
-	[0xF9] = &instr_sbc_ind16_y,
-	[0xFD] = &instr_sbc_ind16_x,
-	[0xFE] = &instr_inc_ind16_x,
+	/* 0x00 */ &instr_brk, &instr_ora_ind_x, &instr_kil, NULL,
+	/* 0x04 */ &instr_nop_ind8, &instr_ora_ind8, &instr_asl_ind8, NULL,
+	/* 0x08 */ &instr_php, &instr_ora_imm, &instr_asl_a, NULL,
+	/* 0x0c */ &instr_nop_ind16, &instr_ora_ind16, &instr_asl_ind16, NULL,
+	/* 0x10 */ &instr_bpl, &instr_ora_ind_y, &instr_kil, NULL,
+	/* 0x14 */ &instr_nop_ind8_x, &instr_ora_ind8_x, &instr_asl_ind8_x, NULL,
+	/* 0x18 */ &instr_clc, &instr_ora_ind16_y, &instr_nop, NULL,
+	/* 0x1C */ &instr_nop_ind16_x, &instr_ora_ind16_x, &instr_asl_ind16_x, NULL,
+	/* 0x20 */ &instr_jsr, &instr_and_ind_x, &instr_kil, NULL,
+	/* 0x24 */ &instr_bit_ind8, &instr_and_ind8, &instr_rol_ind8, NULL,
+	/* 0x28 */ &instr_plp, &instr_and_imm, &instr_rol_a, NULL,
+	/* 0x2C */ &instr_bit_ind16, &instr_and_ind16, &instr_rol_ind16, NULL,
+	/* 0x30 */ &instr_bmi, &instr_and_ind_y, &instr_kil, NULL,
+	/* 0x34 */ &instr_nop_ind8_x, &instr_and_ind8_x, &instr_rol_ind8_x, NULL,
+	/* 0x38 */ &instr_sec, &instr_and_ind16_y, &instr_nop, NULL,
+	/* 0x3C */ &instr_nop_ind16_x, &instr_and_ind16_x, &instr_rol_ind16_x, NULL,
+	/* 0x40 */ &instr_rti, &instr_eor_ind_x, &instr_kil, NULL,
+	/* 0x44 */ &instr_nop_ind8, &instr_eor_ind8, &instr_lsr_ind8, NULL,
+	/* 0x48 */ &instr_pha, &instr_eor_imm, &instr_lsr_a, NULL,
+	/* 0x4C */ &instr_jmp_imm, &instr_eor_ind16, &instr_lsr_ind16, NULL,
+	/* 0x50 */ &instr_bvc, &instr_eor_ind_y, &instr_kil, NULL,
+	/* 0x54 */ &instr_nop_ind8_x, &instr_eor_ind8_x, &instr_lsr_ind8_x, NULL,
+	/* 0x58 */ &instr_cli, &instr_eor_ind16_y, &instr_nop, NULL,
+	/* 0x5C */ &instr_nop_ind16_x, &instr_eor_ind16_x, &instr_lsr_ind16_x, NULL,
+	/* 0x60 */ &instr_rts, &instr_adc_ind_x, &instr_kil, NULL,
+	/* 0x64 */ &instr_nop_ind8, &instr_adc_ind8, &instr_ror_ind8, NULL,
+	/* 0x68 */ &instr_pla, &instr_adc_imm, &instr_ror_a, NULL,
+	/* 0x6C */ &instr_jmp_ind, &instr_adc_ind16, &instr_ror_ind16, NULL,
+	/* 0x70 */ &instr_bvs, &instr_adc_ind_y, &instr_kil, NULL,
+	/* 0x74 */ &instr_nop_ind8_x, &instr_adc_ind8_x, &instr_ror_ind8_x, NULL,
+	/* 0x78 */ &instr_sei, &instr_adc_ind16_y, &instr_nop, NULL,
+	/* 0x7C */ &instr_nop_ind16_x, &instr_adc_ind16_x, &instr_ror_ind16_x, NULL,
+	/* 0x80 */ &instr_nop_imm, &instr_sta_ind_x, &instr_nop_imm, NULL,
+	/* 0x84 */ &instr_sty_ind8, &instr_sta_ind8, &instr_stx_ind8, NULL,
+	/* 0x88 */ &instr_dey, &instr_nop_imm, &instr_txa, NULL,
+	/* 0x8C */ &instr_sty_ind16, &instr_sta_ind16, &instr_stx_ind16, NULL,
+	/* 0x90 */ &instr_bcc, &instr_sta_ind_y, &instr_kil, NULL,
+	/* 0x94 */ &instr_sty_ind8_x, &instr_sta_ind8_x, &instr_stx_ind8_y, NULL,
+	/* 0x98 */ &instr_tya, &instr_sta_ind16_y, &instr_txs, NULL,
+	/* 0x9C */ NULL, &instr_sta_ind16_x, NULL, NULL,
+	/* 0xA0 */ &instr_ldy_imm, &instr_lda_ind_x, &instr_ldx_imm, NULL,
+	/* 0xA4 */ &instr_ldy_ind8, &instr_lda_ind8, &instr_ldx_ind8, NULL,
+	/* 0xA8 */ &instr_tay, &instr_lda_imm, &instr_tax, NULL,
+	/* 0xAC */ &instr_ldy_ind16, &instr_lda_ind16, &instr_ldx_ind16, NULL,
+	/* 0xB0 */ &instr_bcs, &instr_lda_ind_y, &instr_kil, NULL,
+	/* 0xB4 */ &instr_ldy_ind8_x, &instr_lda_ind8_x, &instr_ldx_ind8_y, NULL,
+	/* 0xB8 */ &instr_clv, &instr_lda_ind16_y, &instr_tsx, NULL,
+	/* 0xBC */ &instr_ldy_ind16_x, &instr_lda_ind16_x, &instr_ldx_ind16_y, NULL,
+	/* 0xC0 */ &instr_cpy_imm, &instr_cmp_ind_x, &instr_nop_imm, NULL,
+	/* 0xC4 */ &instr_cpy_ind8, &instr_cmp_ind8, &instr_dec_ind8, NULL,
+	/* 0xC8 */ &instr_iny, &instr_cmp_imm, &instr_dex, NULL,
+	/* 0xCC */ &instr_cpy_ind16, &instr_cmp_ind16, &instr_dec_ind16, NULL,
+	/* 0xD0 */ &instr_bne, &instr_cmp_ind_y, &instr_kil, NULL,
+	/* 0xD4 */ &instr_nop_ind8_x, &instr_cmp_ind8_x, &instr_dec_ind8_x, NULL,
+	/* 0xD8 */ &instr_cld, &instr_cmp_ind16_y, &instr_nop, NULL,
+	/* 0xDC */ &instr_nop_ind16_x, &instr_cmp_ind16_x, &instr_dec_ind16_x, NULL,
+	/* 0xE0 */ &instr_cpx_imm, &instr_sbc_ind_x, &instr_nop_imm, NULL,
+	/* 0xE4 */ &instr_cpx_ind8, &instr_sbc_ind8, &instr_inc_ind8, NULL,
+	/* 0xE8 */ &instr_inx, &instr_sbc_imm, &instr_nop, NULL,
+	/* 0xEC */ &instr_cpx_ind16, &instr_sbc_ind16, &instr_inc_ind16, NULL,
+	/* 0xF0 */ &instr_beq, &instr_sbc_ind_y, &instr_kil, NULL,
+	/* 0xF4 */ &instr_nop_ind8_x, &instr_sbc_ind8_x, &instr_inc_ind8_x, NULL,
+	/* 0xF8 */ &instr_sed, &instr_sbc_ind16_y, &instr_nop, NULL,
+	/* 0xFC */ &instr_nop_ind16_x, &instr_sbc_ind16_x, &instr_inc_ind16_x, NULL,
 };

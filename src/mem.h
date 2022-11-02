@@ -39,4 +39,9 @@ static inline void mem_set_gpu_reg(mem_t *mem, uint16_t r, uint8_t v)
 	mem->gpu_regs[r - 0x2000] = v;
 }
 
+static inline uint8_t mem_get_gpu_reg(mem_t *mem, uint16_t r)
+{
+	return mem->gpu_regs[r - 0x2000];
+}
+
 #endif

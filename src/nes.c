@@ -29,7 +29,7 @@ nes_t *nes_new(const void *rom_data, size_t rom_size)
 	if (!nes->cpu)
 		return NULL;
 
-	nes->gpu = gpu_new(nes->mem);
+	nes->gpu = gpu_new(nes, nes->mem);
 	if (!nes->gpu)
 		return NULL;
 
@@ -50,7 +50,7 @@ void nes_del(nes_t *nes)
 
 void nes_frame(nes_t *nes, uint8_t *video_buf, int16_t *audio_buf, uint32_t joypad)
 {
-	for (size_t i = 0 ; i < 357954; ++i) /* 532034 in PAL */
+	for (size_t i = 0 ; i < 357368; ++i) /* 532034 in PAL */
 	{
 		cpu_clock(nes->cpu);
 		gpu_clock(nes->gpu);
