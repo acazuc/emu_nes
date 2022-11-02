@@ -263,7 +263,7 @@ static void exec_##name(cpu_t *cpu) \
 { \
 	int8_t dd = cpu_fetch8(cpu); \
 	if (CPU_GET_FLAG(cpu, CPU_FLAG_##flag) == v) \
-		cpu->regs.pc = (cpu->regs.pc & 0xFF00) | ((cpu->regs.pc + dd) & 0xFF); \
+		cpu->regs.pc += dd; \
 } \
 static void print_##name(cpu_t *cpu, char *data, size_t size) \
 { \
