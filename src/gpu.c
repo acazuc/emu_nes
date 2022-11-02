@@ -1,4 +1,5 @@
 #include "gpu.h"
+#include "mem.h"
 #include <stdlib.h>
 
 gpu_t *gpu_new(mem_t *mem)
@@ -19,6 +20,7 @@ void gpu_del(gpu_t *gpu)
 
 static void gpu_cycle(gpu_t *gpu)
 {
+	mem_set_ppu_reg(gpu->mem, MEM_REG_PPU_STATUS, 0x80);
 }
 
 void gpu_clock(gpu_t *gpu)

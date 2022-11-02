@@ -13,4 +13,8 @@ typedef struct cpu_instr
 
 extern const cpu_instr_t *cpu_instr[256];
 
+extern const cpu_instr_t irq_instr;
+extern const cpu_instr_t nmi_instr;
+extern const cpu_instr_t reset_instr;
+
 #endif
