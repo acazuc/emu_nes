@@ -55,6 +55,6 @@ void nes_frame(nes_t *nes, uint8_t *video_buf, int16_t *audio_buf, uint32_t joyp
 		cpu_clock(nes->cpu);
 		gpu_clock(nes->gpu);
 	}
-	memset(video_buf, 0, 256 * 240 * 4);
+	memcpy(video_buf, nes->gpu->data, 256 * 240 * 4);
 	memset(audio_buf, 0, 960 * 2);
 }

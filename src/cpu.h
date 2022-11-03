@@ -29,9 +29,9 @@ enum cpu_flag
 do \
 { \
 	if (v) \
-		(cpu)->regs.p |= f; \
+		(cpu)->regs.p |= (f); \
 	else \
-		(cpu)->regs.p &= ~f; \
+		(cpu)->regs.p &= ~(f); \
 } while (0)
 
 #define CPU_SET_FLAG_C(cpu, v) CPU_SET_FLAG(cpu, CPU_FLAG_C, v)
@@ -59,6 +59,7 @@ typedef struct cpu
 	uint8_t clock_count;
 	uint8_t instr_delay;
 	char nmi;
+	char reset;
 } cpu_t;
 
 cpu_t *cpu_new(mem_t *mem);

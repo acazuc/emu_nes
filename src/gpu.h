@@ -10,6 +10,7 @@ typedef struct gpu
 {
 	nes_t *nes;
 	mem_t *mem;
+	uint8_t data[256 * 240 * 4];
 	uint8_t clock_count;
 	uint16_t x;
 	uint16_t y;

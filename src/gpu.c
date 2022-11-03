@@ -23,6 +23,18 @@ void gpu_del(gpu_t *gpu)
 
 static void gpu_cycle(gpu_t *gpu)
 {
+	if (gpu->x < 256 && gpu->y < 240)
+	{
+		uint16_t base = 0;//(mem_get_gpu_reg(gpu->mem, MEM_REG_GPU_RC1) & 0x10) ? 0x1000 : 0;
+		//printf("addr[%u, %u] = %x\n", gpu->x, gpu->y, gpu->x / 8 + gpu->y / 8 * 32);
+		uint8_t v = gpu->mem->gpu_pattern0[base + gpu->x / 8 + gpu->y / 8 * 32];
+		v = v | (v << 6);
+		uint32_t idx = (gpu->x + gpu->y * 256) * 4;
+		gpu->data[idx + 0] = v;
+		gpu->data[idx + 1] = v;
+		gpu->data[idx + 2] = v;
+		gpu->data[idx + 3] = 0xff;
+	}
 	gpu->x++;
 	if (gpu->x == 341)
 	{

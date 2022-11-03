@@ -7,7 +7,7 @@
 #include <stdio.h>
 
 #define CPU_INSTR(name) \
-static const cpu_instr_t instr_##name = \
+static const cpu_instr_t name = \
 { \
 	.exec = exec_##name, \
 	.print = print_##name, \
@@ -243,7 +243,7 @@ LDR_IND16(y);
 static void exec_ld##rd##_ind8_##rs(cpu_t *cpu) \
 { \
 	uint8_t ind = cpu_fetch8(cpu); \
-	cpu->regs.rd = mem_get(cpu->mem, ind + cpu->regs.rs); \
+	cpu->regs.rd = mem_get(cpu->mem, (ind + cpu->regs.rs) & 0xFF); \
 	CPU_SET_FLAG_Z(cpu, !cpu->regs.rd); \
 	CPU_SET_FLAG_N(cpu, cpu->regs.rd & 0x80); \
 } \
@@ -393,7 +393,7 @@ static void exec_jmp_imm(cpu_t *cpu)
 static void print_jmp_imm(cpu_t *cpu, char *data, size_t size)
 {
 	uint16_t imm = cpu_peek16(cpu);
-	snprintf(data, size, "jmp ($%04" PRIx16 ")", imm);
+	snprintf(data, size, "jmp $%04" PRIx16, imm);
 }
 
 CPU_INSTR(jmp_imm);
@@ -408,8 +408,8 @@ static void exec_jmp_ind(cpu_t *cpu)
 
 static void print_jmp_ind(cpu_t *cpu, char *data, size_t size)
 {
-	uint16_t imm = cpu_peek16(cpu);
-	snprintf(data, size, "jmp ($%04" PRIx16 ")", imm);
+	uint16_t ind = cpu_peek16(cpu);
+	snprintf(data, size, "jmp ($%04" PRIx16 ")", ind);
 }
 
 CPU_INSTR(jmp_ind);
@@ -520,28 +520,37 @@ CPU_INSTR(nop_ind16_x);
 
 static void exec_lda_ind_x(cpu_t *cpu)
 {
-	uint8_t imm = cpu_fetch8(cpu);
-	cpu->regs.a = mem_get(cpu->mem, mem_get(cpu->mem, imm + cpu->regs.x));
+	uint8_t ind = cpu_fetch8(cpu);
+	uint16_t addr = ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 0) & 0xFF) << 0)
+	              | ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 1) & 0xFF) << 8);
+	cpu->regs.a = mem_get(cpu->mem, addr);
+	CPU_SET_FLAG_Z(cpu, !cpu->regs.a);
+	CPU_SET_FLAG_N(cpu, cpu->regs.a & 0x80);
 }
 
 static void print_lda_ind_x(cpu_t *cpu, char *data, size_t size)
 {
-	uint8_t imm = cpu_peek8(cpu);
-	snprintf(data, size, "lda ($%02" PRIx8 ", x)", imm);
+	uint8_t ind = cpu_peek8(cpu);
+	snprintf(data, size, "lda ($%02" PRIx8 ", x)", ind);
 }
 
 CPU_INSTR(lda_ind_x);
 
 static void exec_lda_ind_y(cpu_t *cpu)
 {
-	uint8_t imm = cpu_fetch8(cpu);
-	cpu->regs.a = mem_get(cpu->mem, mem_get(cpu->mem, imm) + cpu->regs.x);
+	uint8_t ind = cpu_fetch8(cpu);
+	uint16_t addr = ((uint16_t)mem_get(cpu->mem, ind + 0) << 0)
+	              | ((uint16_t)mem_get(cpu->mem, ind + 1) << 8);
+	addr += cpu->regs.y;
+	cpu->regs.a = mem_get(cpu->mem, addr);
+	CPU_SET_FLAG_Z(cpu, !cpu->regs.a);
+	CPU_SET_FLAG_N(cpu, cpu->regs.a & 0x80);
 }
 
 static void print_lda_ind_y(cpu_t *cpu, char *data, size_t size)
 {
-	uint8_t imm = cpu_peek8(cpu);
-	snprintf(data, size, "lda ($%02" PRIx8 "), y", imm);
+	uint8_t ind = cpu_peek8(cpu);
+	snprintf(data, size, "lda ($%02" PRIx8 "), y", ind);
 }
 
 CPU_INSTR(lda_ind_y);
@@ -565,13 +574,13 @@ STA_IND16_R(y);
 #define STR_IND8_R(rd, rs) \
 static void exec_st##rd##_ind8_##rs(cpu_t *cpu) \
 { \
-	uint8_t ind8 = cpu_fetch8(cpu); \
-	mem_set(cpu->mem, (uint16_t)ind8 + cpu->regs.rs, cpu->regs.rd); \
+	uint8_t ind = cpu_fetch8(cpu); \
+	mem_set(cpu->mem, (ind + cpu->regs.rs) & 0xFF, cpu->regs.rd); \
 } \
 static void print_st##rd##_ind8_##rs(cpu_t *cpu, char *data, size_t size) \
 { \
-	uint8_t ind8 = cpu_peek8(cpu); \
-	snprintf(data, size, "st" #rd " $%02" PRIx8 ", " #rs, ind8); \
+	uint8_t ind = cpu_peek8(cpu); \
+	snprintf(data, size, "st" #rd " $%02" PRIx8 ", " #rs, ind); \
 } \
 CPU_INSTR(st##rd##_ind8_##rs)
 
@@ -582,10 +591,9 @@ STR_IND8_R(y, x);
 static void exec_sta_ind_x(cpu_t *cpu)
 {
 	uint8_t ind = cpu_fetch8(cpu);
-	uint8_t dst8 = mem_get(cpu->mem, (uint16_t)ind + cpu->regs.x);
-	uint16_t dst16 = ((uint16_t)mem_get(cpu->mem, dst8 + 0) << 0)
-	               | ((uint16_t)mem_get(cpu->mem, dst8 + 1) << 8);
-	mem_set(cpu->mem, dst16, cpu->regs.a);
+	uint16_t addr = ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 0) & 0xFF) << 0)
+	              | ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 1) & 0xFF) << 8);
+	mem_set(cpu->mem, addr, cpu->regs.a);
 }
 
 static void print_sta_ind_x(cpu_t *cpu, char *data, size_t size)
@@ -599,11 +607,10 @@ CPU_INSTR(sta_ind_x);
 static void exec_sta_ind_y(cpu_t *cpu)
 {
 	uint8_t ind = cpu_fetch8(cpu);
-	uint8_t dst8 = mem_get(cpu->mem, ind);
-	uint16_t dst16 = ((uint16_t)mem_get(cpu->mem, dst8 + 0) << 0)
-	               | ((uint16_t)mem_get(cpu->mem, dst8 + 1) << 8);
-	dst16 += cpu->regs.y;
-	mem_set(cpu->mem, dst16, cpu->regs.a);
+	uint16_t addr = ((uint16_t)mem_get(cpu->mem, ind + 0) << 0)
+	              | ((uint16_t)mem_get(cpu->mem, ind + 1) << 8);
+	addr += cpu->regs.y;
+	mem_set(cpu->mem, addr, cpu->regs.a);
 }
 
 static void print_sta_ind_y(cpu_t *cpu, char *data, size_t size)
@@ -666,8 +673,8 @@ CPU_INSTR(name##c_ind8); \
 static void exec_##name##c_ind8_x(cpu_t *cpu) \
 { \
 	uint8_t ind = cpu_fetch8(cpu); \
-	uint8_t val = mem_get(cpu->mem, ind + cpu->regs.x) op 1; \
-	mem_set(cpu->mem, ind + cpu->regs.x, val); \
+	uint8_t val = mem_get(cpu->mem, (ind + cpu->regs.x) & 0xFF) op 1; \
+	mem_set(cpu->mem, (ind + cpu->regs.x) & 0xFF, val); \
 	CPU_SET_FLAG_Z(cpu, !val); \
 	CPU_SET_FLAG_N(cpu, val & 0x80); \
 } \
@@ -767,8 +774,8 @@ CPU_INSTR(op##_ind8); \
 static void exec_##op##_ind8_x(cpu_t *cpu) \
 { \
 	uint8_t ind = cpu_fetch8(cpu); \
-	uint8_t v = op(cpu, mem_get(cpu->mem, ind + cpu->regs.x)); \
-	mem_set(cpu->mem, ind + cpu->regs.x, v); \
+	uint8_t v = op(cpu, mem_get(cpu->mem, (ind + cpu->regs.x) & 0xFF)); \
+	mem_set(cpu->mem, (ind + cpu->regs.x) & 0xFF, v); \
 	CPU_SET_FLAG_Z(cpu, !v); \
 	CPU_SET_FLAG_N(cpu, v & 0x80); \
 } \
@@ -817,7 +824,7 @@ static void exec_##name##_imm(cpu_t *cpu) \
 { \
 	uint8_t imm = cpu_fetch8(cpu); \
 	uint8_t v = cpu->regs.r - imm; \
-	CPU_SET_FLAG_C(cpu, v > cpu->regs.r); \
+	CPU_SET_FLAG_C(cpu, v <= cpu->regs.r); \
 	CPU_SET_FLAG_Z(cpu, !v); \
 	CPU_SET_FLAG_N(cpu, v & 0x80); \
 } \
@@ -831,7 +838,7 @@ static void exec_##name##_ind8(cpu_t *cpu) \
 { \
 	uint8_t ind = cpu_fetch8(cpu); \
 	uint8_t v = cpu->regs.r - mem_get(cpu->mem, ind); \
-	CPU_SET_FLAG_C(cpu, v > cpu->regs.r); \
+	CPU_SET_FLAG_C(cpu, v <= cpu->regs.r); \
 	CPU_SET_FLAG_Z(cpu, !v); \
 	CPU_SET_FLAG_N(cpu, v & 0x80); \
 } \
@@ -845,7 +852,7 @@ static void exec_##name##_ind16(cpu_t *cpu) \
 { \
 	uint16_t ind = cpu_fetch16(cpu); \
 	uint8_t v = cpu->regs.r - mem_get(cpu->mem, ind); \
-	CPU_SET_FLAG_C(cpu, v > cpu->regs.r); \
+	CPU_SET_FLAG_C(cpu, v <= cpu->regs.r); \
 	CPU_SET_FLAG_Z(cpu, !v); \
 	CPU_SET_FLAG_N(cpu, v & 0x80); \
 } \
@@ -865,7 +872,7 @@ static void exec_cmp_ind16_##r(cpu_t *cpu) \
 { \
 	uint16_t ind = cpu_fetch16(cpu); \
 	uint8_t v = cpu->regs.a - mem_get(cpu->mem, ind + cpu->regs.r); \
-	CPU_SET_FLAG_C(cpu, v > cpu->regs.a); \
+	CPU_SET_FLAG_C(cpu, v <= cpu->regs.a); \
 	CPU_SET_FLAG_Z(cpu, !v); \
 	CPU_SET_FLAG_N(cpu, v & 0x80); \
 } \
@@ -882,8 +889,8 @@ CMP_IND16_R(y);
 static void exec_cmp_ind8_x(cpu_t *cpu)
 {
 	uint8_t ind = cpu_fetch8(cpu);
-	uint8_t v = cpu->regs.a - mem_get(cpu->mem, ind + cpu->regs.x);
-	CPU_SET_FLAG_C(cpu, v > cpu->regs.a);
+	uint8_t v = cpu->regs.a - mem_get(cpu->mem, (ind + cpu->regs.x) & 0xFF);
+	CPU_SET_FLAG_C(cpu, v <= cpu->regs.a);
 	CPU_SET_FLAG_Z(cpu, !v);
 	CPU_SET_FLAG_N(cpu, v & 0x80);
 }
@@ -899,11 +906,10 @@ CPU_INSTR(cmp_ind8_x);
 static void exec_cmp_ind_x(cpu_t *cpu)
 {
 	uint8_t ind = cpu_fetch8(cpu);
-	uint8_t mem8 = mem_get(cpu->mem, ind + cpu->regs.x);
-	uint16_t mem16 = ((uint16_t)mem_get(cpu->mem, mem8 + 0) << 0)
-	               | ((uint16_t)mem_get(cpu->mem, mem8 + 1) << 8);
-	uint8_t v = cpu->regs.a - mem_get(cpu->mem, mem16);
-	CPU_SET_FLAG_C(cpu, v > cpu->regs.a);
+	uint16_t addr = ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 0) & 0xFF) << 0)
+	              | ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 1) & 0xFF) << 8);
+	uint8_t v = cpu->regs.a - mem_get(cpu->mem, addr);
+	CPU_SET_FLAG_C(cpu, v <= cpu->regs.a);
 	CPU_SET_FLAG_Z(cpu, !v);
 	CPU_SET_FLAG_N(cpu, v & 0x80);
 }
@@ -919,12 +925,11 @@ CPU_INSTR(cmp_ind_x);
 static void exec_cmp_ind_y(cpu_t *cpu)
 {
 	uint8_t ind = cpu_fetch8(cpu);
-	uint8_t mem8 = mem_get(cpu->mem, ind);
-	uint16_t mem16 = ((uint16_t)mem_get(cpu->mem, mem8 + 0) << 0)
-	               | ((uint16_t)mem_get(cpu->mem, mem8 + 1) << 8);
-	mem16 += cpu->regs.y;
-	uint8_t v = cpu->regs.a - mem_get(cpu->mem, mem16);
-	CPU_SET_FLAG_C(cpu, v > cpu->regs.a);
+	uint16_t addr = ((uint16_t)mem_get(cpu->mem, ind + 0) << 0)
+	              | ((uint16_t)mem_get(cpu->mem, ind + 1) << 8);
+	addr += cpu->regs.y;
+	uint8_t v = cpu->regs.a - mem_get(cpu->mem, addr);
+	CPU_SET_FLAG_C(cpu, v <= cpu->regs.a);
 	CPU_SET_FLAG_Z(cpu, !v);
 	CPU_SET_FLAG_N(cpu, v & 0x80);
 }
@@ -980,7 +985,7 @@ static void adc(cpu_t *cpu, uint8_t n)
 	CPU_SET_FLAG_N(cpu, v & 0x80);
 	CPU_SET_FLAG_Z(cpu, !v);
 	CPU_SET_FLAG_C(cpu, v < cpu->regs.a);
-	CPU_SET_FLAG_V(cpu, (~(cpu->regs.a ^ op) & (v ^ op)) & 0x80);
+	CPU_SET_FLAG_V(cpu, (~(cpu->regs.a ^ n) & (v ^ n)) & 0x80);
 	cpu->regs.a = v;
 }
 
@@ -990,8 +995,8 @@ static void sbc(cpu_t *cpu, uint8_t n)
 	uint8_t v = cpu->regs.a - op;
 	CPU_SET_FLAG_N(cpu, v & 0x80);
 	CPU_SET_FLAG_Z(cpu, !v);
-	CPU_SET_FLAG_C(cpu, op <= cpu->regs.a);
-	CPU_SET_FLAG_V(cpu, ((cpu->regs.a ^ op) & (v ^ op)) & 0x80);
+	CPU_SET_FLAG_C(cpu, v <= cpu->regs.a);
+	CPU_SET_FLAG_V(cpu, ((cpu->regs.a ^ n) & (v ^ cpu->regs.a)) & 0x80);
 	cpu->regs.a = v;
 }
 
@@ -1045,7 +1050,7 @@ CPU_INSTR(op##_ind8); \
 static void exec_##op##_ind8_x(cpu_t *cpu) \
 { \
 	uint8_t ind = cpu_fetch8(cpu); \
-	op(cpu, mem_get(cpu->mem, ind + cpu->regs.x)); \
+	op(cpu, mem_get(cpu->mem, (ind + cpu->regs.x) & 0xFF)); \
 } \
 static void print_##op##_ind8_x(cpu_t *cpu, char *data, size_t size) \
 { \
@@ -1089,10 +1094,9 @@ CPU_INSTR(op##_ind16_y); \
 static void exec_##op##_ind_x(cpu_t *cpu) \
 { \
 	uint8_t ind = cpu_fetch8(cpu); \
-	uint8_t mem8 = mem_get(cpu->mem, ind + cpu->regs.x); \
-	uint16_t mem16 = ((uint16_t)mem_get(cpu->mem, mem8 + 0) << 0) \
-	               | ((uint16_t)mem_get(cpu->mem, mem8 + 1) << 8); \
-	op(cpu, mem_get(cpu->mem, mem16)); \
+	uint16_t addr = ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 0) & 0xFF) << 0) \
+	              | ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 1) & 0xFF) << 8); \
+	op(cpu, mem_get(cpu->mem, addr)); \
 } \
 static void print_##op##_ind_x(cpu_t *cpu, char *data, size_t size) \
 { \
@@ -1103,11 +1107,10 @@ CPU_INSTR(op##_ind_x); \
 static void exec_##op##_ind_y(cpu_t *cpu) \
 { \
 	uint8_t ind = cpu_fetch8(cpu); \
-	uint8_t mem8 = mem_get(cpu->mem, ind); \
-	uint16_t mem16 = ((uint16_t)mem_get(cpu->mem, mem8 + 0) << 0) \
-	               | ((uint16_t)mem_get(cpu->mem, mem8 + 1) << 8); \
-	mem16 += cpu->regs.y; \
-	op(cpu, mem_get(cpu->mem, mem16)); \
+	uint16_t addr = ((uint16_t)mem_get(cpu->mem, ind + 0) << 0) \
+	              | ((uint16_t)mem_get(cpu->mem, ind + 1) << 8); \
+	addr += cpu->regs.y; \
+	op(cpu, mem_get(cpu->mem, addr)); \
 } \
 static void print_##op##_ind_y(cpu_t *cpu, char *data, size_t size) \
 { \
@@ -1136,6 +1139,415 @@ static void print_kil(cpu_t *cpu, char *data, size_t size)
 }
 
 CPU_INSTR(kil);
+
+static void exec_sax_ind8(cpu_t *cpu)
+{
+	uint8_t ind = cpu_fetch8(cpu);
+	mem_set(cpu->mem, ind, cpu->regs.a & cpu->regs.x);
+}
+
+static void print_sax_ind8(cpu_t *cpu, char *data, size_t size)
+{
+	uint8_t ind = cpu_peek8(cpu);
+	snprintf(data, size, "sax $%02" PRIx8, ind);
+}
+
+CPU_INSTR(sax_ind8);
+
+static void exec_sax_ind8_y(cpu_t *cpu)
+{
+	uint8_t ind = cpu_fetch8(cpu);
+	mem_set(cpu->mem, (ind + cpu->regs.y) & 0xFF, cpu->regs.a & cpu->regs.x);
+}
+
+static void print_sax_ind8_y(cpu_t *cpu, char *data, size_t size)
+{
+	uint8_t ind = cpu_peek8(cpu);
+	snprintf(data, size, "sax $%02" PRIx8 ", y", ind);
+}
+
+CPU_INSTR(sax_ind8_y);
+
+static void exec_sax_ind16(cpu_t *cpu)
+{
+	uint16_t ind = cpu_fetch16(cpu);
+	mem_set(cpu->mem, ind, cpu->regs.a & cpu->regs.x);
+}
+
+static void print_sax_ind16(cpu_t *cpu, char *data, size_t size)
+{
+	uint16_t ind = cpu_peek16(cpu);
+	snprintf(data, size, "sax $%04" PRIx16, ind);
+}
+
+CPU_INSTR(sax_ind16);
+
+static void exec_sax_ind_x(cpu_t *cpu)
+{
+	uint8_t ind = cpu_fetch8(cpu);
+	uint16_t addr = ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 0) & 0xFF) << 0)
+	              | ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 1) & 0xFF) << 8);
+	mem_set(cpu->mem, addr, cpu->regs.a & cpu->regs.x);
+}
+
+static void print_sax_ind_x(cpu_t *cpu, char *data, size_t size)
+{
+	uint8_t ind = cpu_peek8(cpu);
+	snprintf(data, size, "sax ($%02" PRIx8 ", x)", ind);
+}
+
+CPU_INSTR(sax_ind_x);
+
+static void exec_lax_imm(cpu_t *cpu)
+{
+	uint8_t imm = cpu_fetch8(cpu);
+	cpu->regs.a = imm;
+	cpu->regs.x = imm;
+	CPU_SET_FLAG_Z(cpu, !cpu->regs.x);
+	CPU_SET_FLAG_N(cpu, cpu->regs.x & 0x80);
+}
+
+static void print_lax_imm(cpu_t *cpu, char *data, size_t size)
+{
+	uint8_t imm = cpu_peek8(cpu);
+	snprintf(data, size, "lax #$%02" PRIx8, imm);
+}
+
+CPU_INSTR(lax_imm);
+
+static void exec_lax_ind8(cpu_t *cpu)
+{
+	uint8_t ind = cpu_fetch8(cpu);
+	cpu->regs.a = mem_get(cpu->mem, ind);
+	cpu->regs.x = cpu->regs.a;
+	CPU_SET_FLAG_Z(cpu, !cpu->regs.x);
+	CPU_SET_FLAG_N(cpu, cpu->regs.x & 0x80);
+}
+
+static void print_lax_ind8(cpu_t *cpu, char *data, size_t size)
+{
+	uint8_t ind = cpu_peek8(cpu);
+	snprintf(data, size, "lax $%02" PRIx8, ind);
+}
+
+CPU_INSTR(lax_ind8);
+
+static void exec_lax_ind8_y(cpu_t *cpu)
+{
+	uint8_t ind = cpu_fetch8(cpu);
+	cpu->regs.a = mem_get(cpu->mem, (ind + cpu->regs.y) & 0xFF);
+	cpu->regs.x = cpu->regs.a;
+	CPU_SET_FLAG_Z(cpu, !cpu->regs.x);
+	CPU_SET_FLAG_N(cpu, cpu->regs.x & 0x80);
+}
+
+static void print_lax_ind8_y(cpu_t *cpu, char *data, size_t size)
+{
+	uint8_t ind = cpu_peek8(cpu);
+	snprintf(data, size, "lax $%02" PRIx8 ", y", ind);
+}
+
+CPU_INSTR(lax_ind8_y);
+
+static void exec_lax_ind16(cpu_t *cpu)
+{
+	uint16_t ind = cpu_fetch16(cpu);
+	cpu->regs.a = mem_get(cpu->mem, ind);
+	cpu->regs.x = cpu->regs.a;
+	CPU_SET_FLAG_Z(cpu, !cpu->regs.x);
+	CPU_SET_FLAG_N(cpu, cpu->regs.x & 0x80);
+}
+
+static void print_lax_ind16(cpu_t *cpu, char *data, size_t size)
+{
+	uint16_t ind = cpu_peek16(cpu);
+	snprintf(data, size, "lax $%04" PRIx16, ind);
+}
+
+CPU_INSTR(lax_ind16);
+
+static void exec_lax_ind16_y(cpu_t *cpu)
+{
+	uint16_t ind = cpu_fetch16(cpu);
+	cpu->regs.a = mem_get(cpu->mem, ind + cpu->regs.y);
+	cpu->regs.x = cpu->regs.a;
+	CPU_SET_FLAG_Z(cpu, !cpu->regs.x);
+	CPU_SET_FLAG_N(cpu, cpu->regs.x & 0x80);
+}
+
+static void print_lax_ind16_y(cpu_t *cpu, char *data, size_t size)
+{
+	uint16_t ind = cpu_peek16(cpu);
+	snprintf(data, size, "lax $%04" PRIx16 ", y", ind);
+}
+
+CPU_INSTR(lax_ind16_y);
+
+static void exec_lax_ind_x(cpu_t *cpu)
+{
+	uint8_t ind = cpu_fetch8(cpu);
+	uint16_t addr = ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 0) & 0xFF) << 0)
+	              | ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 1) & 0xFF) << 8);
+	cpu->regs.a = mem_get(cpu->mem, addr);
+	cpu->regs.x = cpu->regs.a;
+	CPU_SET_FLAG_Z(cpu, !cpu->regs.x);
+	CPU_SET_FLAG_N(cpu, cpu->regs.x & 0x80);
+}
+
+static void print_lax_ind_x(cpu_t *cpu, char *data, size_t size)
+{
+	uint8_t ind = cpu_peek8(cpu);
+	snprintf(data, size, "lax ($%02" PRIx8 ", x)", ind);
+}
+
+CPU_INSTR(lax_ind_x);
+
+static void exec_lax_ind_y(cpu_t *cpu)
+{
+	uint8_t ind = cpu_fetch8(cpu);
+	uint16_t addr = ((uint16_t)mem_get(cpu->mem, ind + 0) << 0)
+	              | ((uint16_t)mem_get(cpu->mem, ind + 1) << 8);
+	addr += cpu->regs.y;
+	cpu->regs.a = mem_get(cpu->mem, addr);
+	cpu->regs.x = cpu->regs.a;
+	CPU_SET_FLAG_Z(cpu, !cpu->regs.x);
+	CPU_SET_FLAG_N(cpu, cpu->regs.x & 0x80);
+}
+
+static void print_lax_ind_y(cpu_t *cpu, char *data, size_t size)
+{
+	uint8_t ind = cpu_peek8(cpu);
+	snprintf(data, size, "lax ($%02" PRIx8 "), y", ind);
+}
+
+CPU_INSTR(lax_ind_y);
+
+static void exec_axs_imm(cpu_t *cpu)
+{
+	uint8_t imm = cpu_fetch8(cpu);
+}
+
+static void print_axs_imm(cpu_t *cpu, char *data, size_t size)
+{
+	uint8_t imm = cpu_peek8(cpu);
+	snprintf(data, size, "axs #$%02" PRIx8, imm);
+}
+
+CPU_INSTR(axs_imm);
+
+static uint8_t slo(cpu_t *cpu, uint8_t v)
+{
+	uint8_t n = asl(cpu, v);
+	ora(cpu, n);
+	return n;
+}
+
+static uint8_t rla(cpu_t *cpu, uint8_t v)
+{
+	uint8_t n = rol(cpu, v);
+	and(cpu, n);
+	return n;
+}
+
+static uint8_t sre(cpu_t *cpu, uint8_t v)
+{
+	uint8_t n = lsr(cpu, v);
+	eor(cpu, n);
+	return n;
+}
+
+static uint8_t rra(cpu_t *cpu, uint8_t v)
+{
+	uint8_t n = ror(cpu, v);
+	adc(cpu, n);
+	return n;
+}
+
+static uint8_t dcp(cpu_t *cpu, uint8_t v)
+{
+	uint8_t n = v - 1;
+	v = cpu->regs.a - n;
+	CPU_SET_FLAG_C(cpu, v <= cpu->regs.a);
+	CPU_SET_FLAG_Z(cpu, !v);
+	CPU_SET_FLAG_N(cpu, v & 0x80);
+	return n;
+}
+
+static uint8_t isc(cpu_t *cpu, uint8_t v)
+{
+	uint8_t n = v + 1;
+	sbc(cpu, n);
+	return n;
+}
+
+#define ALU_EXT(name) \
+static void exec_##name##_ind8(cpu_t *cpu) \
+{ \
+	uint8_t ind = cpu_fetch8(cpu); \
+	mem_set(cpu->mem, ind, name(cpu, mem_get(cpu->mem, ind))); \
+} \
+static void print_##name##_ind8(cpu_t *cpu, char *data, size_t size) \
+{ \
+	uint8_t ind = cpu_peek8(cpu); \
+	snprintf(data, size, #name " $%02" PRIx8, ind); \
+} \
+CPU_INSTR(name##_ind8); \
+static void exec_##name##_ind8_x(cpu_t *cpu) \
+{ \
+	uint8_t ind = cpu_fetch8(cpu); \
+	mem_set(cpu->mem, (ind + cpu->regs.x) & 0xFF, \
+	        name(cpu, mem_get(cpu->mem, (ind + cpu->regs.x) & 0xFF))); \
+} \
+static void print_##name##_ind8_x(cpu_t *cpu, char *data, size_t size) \
+{ \
+	uint8_t ind = cpu_peek8(cpu); \
+	snprintf(data, size, #name " $%02" PRIx8 ", x", ind); \
+} \
+CPU_INSTR(name##_ind8_x); \
+static void exec_##name##_ind16(cpu_t *cpu) \
+{ \
+	uint16_t ind = cpu_fetch16(cpu); \
+	mem_set(cpu->mem, ind, name(cpu, mem_get(cpu->mem, ind))); \
+} \
+static void print_##name##_ind16(cpu_t *cpu, char *data, size_t size) \
+{ \
+	uint16_t ind = cpu_peek16(cpu); \
+	snprintf(data, size, #name " $%04" PRIx16, ind); \
+} \
+CPU_INSTR(name##_ind16); \
+static void exec_##name##_ind16_x(cpu_t *cpu) \
+{ \
+	uint16_t ind = cpu_fetch16(cpu); \
+	mem_set(cpu->mem, ind + cpu->regs.x, \
+	        name(cpu, mem_get(cpu->mem, ind + cpu->regs.x))); \
+} \
+static void print_##name##_ind16_x(cpu_t *cpu, char *data, size_t size) \
+{ \
+	uint16_t ind = cpu_peek16(cpu); \
+	snprintf(data, size, #name " $%04" PRIx16 ", x", ind); \
+} \
+CPU_INSTR(name##_ind16_x); \
+static void exec_##name##_ind16_y(cpu_t *cpu) \
+{ \
+	uint16_t ind = cpu_fetch16(cpu); \
+	mem_set(cpu->mem, ind + cpu->regs.y, name(cpu, mem_get(cpu->mem, ind + cpu->regs.y))); \
+} \
+static void print_##name##_ind16_y(cpu_t *cpu, char *data, size_t size) \
+{ \
+	uint16_t ind = cpu_peek16(cpu); \
+	snprintf(data, size, #name " $%04" PRIx16 ", y", ind); \
+} \
+CPU_INSTR(name##_ind16_y); \
+static void exec_##name##_ind_x(cpu_t *cpu) \
+{ \
+	uint8_t ind = cpu_fetch8(cpu); \
+	uint16_t addr = ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 0) & 0xFF) << 0) \
+	              | ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 1) & 0xFF) << 8); \
+	mem_set(cpu->mem, addr, name(cpu, mem_get(cpu->mem, addr))); \
+} \
+static void print_##name##_ind_x(cpu_t *cpu, char *data, size_t size) \
+{ \
+	uint8_t ind = cpu_peek8(cpu); \
+	snprintf(data, size, #name " ($%02" PRIx8 ", x)", ind); \
+} \
+CPU_INSTR(name##_ind_x); \
+static void exec_##name##_ind_y(cpu_t *cpu) \
+{ \
+	uint8_t ind = cpu_fetch8(cpu); \
+	uint16_t addr = ((uint16_t)mem_get(cpu->mem, ind + 0) << 0) \
+	              | ((uint16_t)mem_get(cpu->mem, ind + 1) << 8); \
+	addr += cpu->regs.y; \
+	mem_set(cpu->mem, addr, name(cpu, mem_get(cpu->mem, addr))); \
+} \
+static void print_##name##_ind_y(cpu_t *cpu, char *data, size_t size) \
+{ \
+	uint8_t ind = cpu_peek8(cpu); \
+	snprintf(data, size, #name " ($%02" PRIx8 "), y", ind); \
+} \
+CPU_INSTR(name##_ind_y)
+
+ALU_EXT(slo);
+ALU_EXT(rla);
+ALU_EXT(sre);
+ALU_EXT(rra);
+ALU_EXT(dcp);
+ALU_EXT(isc);
+
+static void exec_anc_imm(cpu_t *cpu)
+{
+	uint8_t imm = cpu_fetch8(cpu);
+	and(cpu, imm);
+	cpu->regs.a = asl(cpu, cpu->regs.a);
+}
+
+static void print_anc_imm(cpu_t *cpu, char *data, size_t size)
+{
+	uint8_t imm = cpu_peek8(cpu);
+	printf(data, size, "anc #$%02" PRIx8, imm);
+}
+
+CPU_INSTR(anc_imm);
+
+static void exec_alr_imm(cpu_t *cpu)
+{
+	uint8_t imm = cpu_fetch8(cpu);
+	and(cpu, imm);
+	cpu->regs.a = lsr(cpu, cpu->regs.a);
+}
+
+static void print_alr_imm(cpu_t *cpu, char *data, size_t size)
+{
+	uint8_t imm = cpu_peek8(cpu);
+	snprintf(data, size, "alr #$%02" PRIx8, imm);
+}
+
+CPU_INSTR(alr_imm);
+
+static void exec_arr_imm(cpu_t *cpu)
+{
+	uint8_t imm = cpu_fetch8(cpu);
+	and(cpu, imm);
+	cpu->regs.a = ror(cpu, cpu->regs.a);
+}
+
+static void print_arr_imm(cpu_t *cpu, char *data, size_t size)
+{
+	uint8_t imm = cpu_peek8(cpu);
+	snprintf(data, size, "arr #$%02" PRIx8, imm);
+}
+
+CPU_INSTR(arr_imm);
+
+static void exec_xaa_imm(cpu_t *cpu)
+{
+	uint8_t imm = cpu_fetch8(cpu);
+	cpu->regs.a = cpu->regs.x;
+	and(cpu, imm);
+}
+
+static void print_xaa_imm(cpu_t *cpu, char *data, size_t size)
+{
+	uint8_t imm = cpu_peek8(cpu);
+	snprintf(data, size, "xaa #$%02" PRIx8, imm);
+}
+
+CPU_INSTR(xaa_imm);
+
+static void exec_las_ind16_y(cpu_t *cpu)
+{
+	uint16_t ind = cpu_fetch16(cpu);
+	cpu->regs.s = cpu->regs.s & mem_get(cpu->mem, ind + cpu->regs.y);
+	cpu->regs.a = cpu->regs.s;
+	cpu->regs.x = cpu->regs.s;
+}
+
+static void print_las_ind16_y(cpu_t *cpu, char *data, size_t size)
+{
+	uint16_t ind = cpu_peek16(cpu);
+	snprintf(data, size, "las $%04" PRIx16 ", y", ind);
+}
+
+CPU_INSTR(las_ind16_y);
 
 static void exec_irq(cpu_t *cpu)
 {
@@ -1211,68 +1623,68 @@ const cpu_instr_t instr_reset =
 
 const cpu_instr_t *cpu_instr[256] =
 {
-	/* 0x00 */ &instr_brk, &instr_ora_ind_x, &instr_kil, NULL,
-	/* 0x04 */ &instr_nop_ind8, &instr_ora_ind8, &instr_asl_ind8, NULL,
-	/* 0x08 */ &instr_php, &instr_ora_imm, &instr_asl_a, NULL,
-	/* 0x0c */ &instr_nop_ind16, &instr_ora_ind16, &instr_asl_ind16, NULL,
-	/* 0x10 */ &instr_bpl, &instr_ora_ind_y, &instr_kil, NULL,
-	/* 0x14 */ &instr_nop_ind8_x, &instr_ora_ind8_x, &instr_asl_ind8_x, NULL,
-	/* 0x18 */ &instr_clc, &instr_ora_ind16_y, &instr_nop, NULL,
-	/* 0x1C */ &instr_nop_ind16_x, &instr_ora_ind16_x, &instr_asl_ind16_x, NULL,
-	/* 0x20 */ &instr_jsr, &instr_and_ind_x, &instr_kil, NULL,
-	/* 0x24 */ &instr_bit_ind8, &instr_and_ind8, &instr_rol_ind8, NULL,
-	/* 0x28 */ &instr_plp, &instr_and_imm, &instr_rol_a, NULL,
-	/* 0x2C */ &instr_bit_ind16, &instr_and_ind16, &instr_rol_ind16, NULL,
-	/* 0x30 */ &instr_bmi, &instr_and_ind_y, &instr_kil, NULL,
-	/* 0x34 */ &instr_nop_ind8_x, &instr_and_ind8_x, &instr_rol_ind8_x, NULL,
-	/* 0x38 */ &instr_sec, &instr_and_ind16_y, &instr_nop, NULL,
-	/* 0x3C */ &instr_nop_ind16_x, &instr_and_ind16_x, &instr_rol_ind16_x, NULL,
-	/* 0x40 */ &instr_rti, &instr_eor_ind_x, &instr_kil, NULL,
-	/* 0x44 */ &instr_nop_ind8, &instr_eor_ind8, &instr_lsr_ind8, NULL,
-	/* 0x48 */ &instr_pha, &instr_eor_imm, &instr_lsr_a, NULL,
-	/* 0x4C */ &instr_jmp_imm, &instr_eor_ind16, &instr_lsr_ind16, NULL,
-	/* 0x50 */ &instr_bvc, &instr_eor_ind_y, &instr_kil, NULL,
-	/* 0x54 */ &instr_nop_ind8_x, &instr_eor_ind8_x, &instr_lsr_ind8_x, NULL,
-	/* 0x58 */ &instr_cli, &instr_eor_ind16_y, &instr_nop, NULL,
-	/* 0x5C */ &instr_nop_ind16_x, &instr_eor_ind16_x, &instr_lsr_ind16_x, NULL,
-	/* 0x60 */ &instr_rts, &instr_adc_ind_x, &instr_kil, NULL,
-	/* 0x64 */ &instr_nop_ind8, &instr_adc_ind8, &instr_ror_ind8, NULL,
-	/* 0x68 */ &instr_pla, &instr_adc_imm, &instr_ror_a, NULL,
-	/* 0x6C */ &instr_jmp_ind, &instr_adc_ind16, &instr_ror_ind16, NULL,
-	/* 0x70 */ &instr_bvs, &instr_adc_ind_y, &instr_kil, NULL,
-	/* 0x74 */ &instr_nop_ind8_x, &instr_adc_ind8_x, &instr_ror_ind8_x, NULL,
-	/* 0x78 */ &instr_sei, &instr_adc_ind16_y, &instr_nop, NULL,
-	/* 0x7C */ &instr_nop_ind16_x, &instr_adc_ind16_x, &instr_ror_ind16_x, NULL,
-	/* 0x80 */ &instr_nop_imm, &instr_sta_ind_x, &instr_nop_imm, NULL,
-	/* 0x84 */ &instr_sty_ind8, &instr_sta_ind8, &instr_stx_ind8, NULL,
-	/* 0x88 */ &instr_dey, &instr_nop_imm, &instr_txa, NULL,
-	/* 0x8C */ &instr_sty_ind16, &instr_sta_ind16, &instr_stx_ind16, NULL,
-	/* 0x90 */ &instr_bcc, &instr_sta_ind_y, &instr_kil, NULL,
-	/* 0x94 */ &instr_sty_ind8_x, &instr_sta_ind8_x, &instr_stx_ind8_y, NULL,
-	/* 0x98 */ &instr_tya, &instr_sta_ind16_y, &instr_txs, NULL,
-	/* 0x9C */ NULL, &instr_sta_ind16_x, NULL, NULL,
-	/* 0xA0 */ &instr_ldy_imm, &instr_lda_ind_x, &instr_ldx_imm, NULL,
-	/* 0xA4 */ &instr_ldy_ind8, &instr_lda_ind8, &instr_ldx_ind8, NULL,
-	/* 0xA8 */ &instr_tay, &instr_lda_imm, &instr_tax, NULL,
-	/* 0xAC */ &instr_ldy_ind16, &instr_lda_ind16, &instr_ldx_ind16, NULL,
-	/* 0xB0 */ &instr_bcs, &instr_lda_ind_y, &instr_kil, NULL,
-	/* 0xB4 */ &instr_ldy_ind8_x, &instr_lda_ind8_x, &instr_ldx_ind8_y, NULL,
-	/* 0xB8 */ &instr_clv, &instr_lda_ind16_y, &instr_tsx, NULL,
-	/* 0xBC */ &instr_ldy_ind16_x, &instr_lda_ind16_x, &instr_ldx_ind16_y, NULL,
-	/* 0xC0 */ &instr_cpy_imm, &instr_cmp_ind_x, &instr_nop_imm, NULL,
-	/* 0xC4 */ &instr_cpy_ind8, &instr_cmp_ind8, &instr_dec_ind8, NULL,
-	/* 0xC8 */ &instr_iny, &instr_cmp_imm, &instr_dex, NULL,
-	/* 0xCC */ &instr_cpy_ind16, &instr_cmp_ind16, &instr_dec_ind16, NULL,
-	/* 0xD0 */ &instr_bne, &instr_cmp_ind_y, &instr_kil, NULL,
-	/* 0xD4 */ &instr_nop_ind8_x, &instr_cmp_ind8_x, &instr_dec_ind8_x, NULL,
-	/* 0xD8 */ &instr_cld, &instr_cmp_ind16_y, &instr_nop, NULL,
-	/* 0xDC */ &instr_nop_ind16_x, &instr_cmp_ind16_x, &instr_dec_ind16_x, NULL,
-	/* 0xE0 */ &instr_cpx_imm, &instr_sbc_ind_x, &instr_nop_imm, NULL,
-	/* 0xE4 */ &instr_cpx_ind8, &instr_sbc_ind8, &instr_inc_ind8, NULL,
-	/* 0xE8 */ &instr_inx, &instr_sbc_imm, &instr_nop, NULL,
-	/* 0xEC */ &instr_cpx_ind16, &instr_sbc_ind16, &instr_inc_ind16, NULL,
-	/* 0xF0 */ &instr_beq, &instr_sbc_ind_y, &instr_kil, NULL,
-	/* 0xF4 */ &instr_nop_ind8_x, &instr_sbc_ind8_x, &instr_inc_ind8_x, NULL,
-	/* 0xF8 */ &instr_sed, &instr_sbc_ind16_y, &instr_nop, NULL,
-	/* 0xFC */ &instr_nop_ind16_x, &instr_sbc_ind16_x, &instr_inc_ind16_x, NULL,
+	/* 0x00 */ &brk, &ora_ind_x, &kil, &slo_ind_x,
+	/* 0x04 */ &nop_ind8, &ora_ind8, &asl_ind8, &slo_ind8,
+	/* 0x08 */ &php, &ora_imm, &asl_a, &anc_imm,
+	/* 0x0c */ &nop_ind16, &ora_ind16, &asl_ind16, &slo_ind16,
+	/* 0x10 */ &bpl, &ora_ind_y, &kil, &slo_ind_y,
+	/* 0x14 */ &nop_ind8_x, &ora_ind8_x, &asl_ind8_x, &slo_ind8_x,
+	/* 0x18 */ &clc, &ora_ind16_y, &nop, &slo_ind16_y,
+	/* 0x1C */ &nop_ind16_x, &ora_ind16_x, &asl_ind16_x, &slo_ind16_x,
+	/* 0x20 */ &jsr, &and_ind_x, &kil, &rla_ind_x,
+	/* 0x24 */ &bit_ind8, &and_ind8, &rol_ind8, &rla_ind8,
+	/* 0x28 */ &plp, &and_imm, &rol_a, &anc_imm,
+	/* 0x2C */ &bit_ind16, &and_ind16, &rol_ind16, &rla_ind16,
+	/* 0x30 */ &bmi, &and_ind_y, &kil, &rla_ind_y,
+	/* 0x34 */ &nop_ind8_x, &and_ind8_x, &rol_ind8_x, &rla_ind8_x,
+	/* 0x38 */ &sec, &and_ind16_y, &nop, &rla_ind16_y,
+	/* 0x3C */ &nop_ind16_x, &and_ind16_x, &rol_ind16_x, &rla_ind16_x,
+	/* 0x40 */ &rti, &eor_ind_x, &kil, &sre_ind_x,
+	/* 0x44 */ &nop_ind8, &eor_ind8, &lsr_ind8, &sre_ind8,
+	/* 0x48 */ &pha, &eor_imm, &lsr_a, &alr_imm,
+	/* 0x4C */ &jmp_imm, &eor_ind16, &lsr_ind16, &sre_ind16,
+	/* 0x50 */ &bvc, &eor_ind_y, &kil, &sre_ind_y,
+	/* 0x54 */ &nop_ind8_x, &eor_ind8_x, &lsr_ind8_x, &sre_ind8_x,
+	/* 0x58 */ &cli, &eor_ind16_y, &nop, &sre_ind16_y,
+	/* 0x5C */ &nop_ind16_x, &eor_ind16_x, &lsr_ind16_x, &sre_ind16_x,
+	/* 0x60 */ &rts, &adc_ind_x, &kil, &rra_ind_x,
+	/* 0x64 */ &nop_ind8, &adc_ind8, &ror_ind8, &rra_ind8,
+	/* 0x68 */ &pla, &adc_imm, &ror_a, &arr_imm,
+	/* 0x6C */ &jmp_ind, &adc_ind16, &ror_ind16, &rra_ind16,
+	/* 0x70 */ &bvs, &adc_ind_y, &kil, &rra_ind_y,
+	/* 0x74 */ &nop_ind8_x, &adc_ind8_x, &ror_ind8_x, &rra_ind8_x,
+	/* 0x78 */ &sei, &adc_ind16_y, &nop, &rra_ind16_y,
+	/* 0x7C */ &nop_ind16_x, &adc_ind16_x, &ror_ind16_x, &rra_ind16_x,
+	/* 0x80 */ &nop_imm, &sta_ind_x, &nop_imm, &sax_ind_x,
+	/* 0x84 */ &sty_ind8, &sta_ind8, &stx_ind8, &sax_ind8,
+	/* 0x88 */ &dey, &nop_imm, &txa, &xaa_imm,
+	/* 0x8C */ &sty_ind16, &sta_ind16, &stx_ind16, &sax_ind16,
+	/* 0x90 */ &bcc, &sta_ind_y, &kil, NULL,
+	/* 0x94 */ &sty_ind8_x, &sta_ind8_x, &stx_ind8_y, &sax_ind8_y,
+	/* 0x98 */ &tya, &sta_ind16_y, &txs, NULL,
+	/* 0x9C */ NULL, &sta_ind16_x, NULL, NULL,
+	/* 0xA0 */ &ldy_imm, &lda_ind_x, &ldx_imm, &lax_ind_x,
+	/* 0xA4 */ &ldy_ind8, &lda_ind8, &ldx_ind8, &lax_ind8,
+	/* 0xA8 */ &tay, &lda_imm, &tax, &lax_imm,
+	/* 0xAC */ &ldy_ind16, &lda_ind16, &ldx_ind16, &lax_ind16,
+	/* 0xB0 */ &bcs, &lda_ind_y, &kil, &lax_ind_y,
+	/* 0xB4 */ &ldy_ind8_x, &lda_ind8_x, &ldx_ind8_y, &lax_ind8_y,
+	/* 0xB8 */ &clv, &lda_ind16_y, &tsx, &las_ind16_y,
+	/* 0xBC */ &ldy_ind16_x, &lda_ind16_x, &ldx_ind16_y, &lax_ind16_y,
+	/* 0xC0 */ &cpy_imm, &cmp_ind_x, &nop_imm, &dcp_ind_x,
+	/* 0xC4 */ &cpy_ind8, &cmp_ind8, &dec_ind8, &dcp_ind8,
+	/* 0xC8 */ &iny, &cmp_imm, &dex, &axs_imm,
+	/* 0xCC */ &cpy_ind16, &cmp_ind16, &dec_ind16, &dcp_ind16,
+	/* 0xD0 */ &bne, &cmp_ind_y, &kil, &dcp_ind_y,
+	/* 0xD4 */ &nop_ind8_x, &cmp_ind8_x, &dec_ind8_x, &dcp_ind8_x,
+	/* 0xD8 */ &cld, &cmp_ind16_y, &nop, &dcp_ind16_y,
+	/* 0xDC */ &nop_ind16_x, &cmp_ind16_x, &dec_ind16_x, &dcp_ind16_x,
+	/* 0xE0 */ &cpx_imm, &sbc_ind_x, &nop_imm, &isc_ind_x,
+	/* 0xE4 */ &cpx_ind8, &sbc_ind8, &inc_ind8, &isc_ind8,
+	/* 0xE8 */ &inx, &sbc_imm, &nop, &sbc_imm,
+	/* 0xEC */ &cpx_ind16, &sbc_ind16, &inc_ind16, &isc_ind16,
+	/* 0xF0 */ &beq, &sbc_ind_y, &kil, &isc_ind_y,
+	/* 0xF4 */ &nop_ind8_x, &sbc_ind8_x, &inc_ind8_x, &isc_ind8_x,
+	/* 0xF8 */ &sed, &sbc_ind16_y, &nop, &isc_ind16_y,
+	/* 0xFC */ &nop_ind16_x, &sbc_ind16_x, &inc_ind16_x, &isc_ind16_x,
 };

@@ -33,7 +33,7 @@ mbc_t *mbc_new(const void *data, size_t size)
 		mbc->trainer = NULL;
 
 	mbc->prg_rom_data = mbc->trainer ? &mbc->data[528] : &mbc->data[16];
-	mbc->prg_rom_size = 16384 << mbc->ines->prg_rom_lsb;
+	mbc->prg_rom_size = 16384 << (mbc->ines->prg_rom_lsb - 1);
 	if (mbc->ines->chr_rom_lsb)
 	{
 		mbc->chr_rom_size = 8192 << mbc->ines->chr_rom_lsb;
@@ -55,35 +55,52 @@ void mbc_del(mbc_t *mbc)
 	free(mbc);
 }
 
-uint8_t mbc_get(mbc_t *mbc, uint16_t addr)
+static uint8_t mmc0_get(mbc_t *mbc, uint16_t addr)
 {
 	if (addr < 0x6000)
-	{
-		/* XXX cartridge expansion */
 		return 0;
-	}
 	if (addr < 0x8000)
-	{
-		/* XXX cartridge SRAM */
 		return 0;
+	if (addr < 0xC000)
+	{
+		addr -= 0x8000;
+		if (addr >= mbc->prg_rom_size)
+			return 0;
+		return mbc->prg_rom_data[addr];
 	}
-	addr -= 0x8000;
+	if (mbc->ines->prg_rom_lsb > 1)
+		addr -= 0x8000;
+	else
+		addr -= 0xC000;
 	if (addr >= mbc->prg_rom_size)
 		return 0;
 	return mbc->prg_rom_data[addr];
 }
 
+static void mmc0_set(mbc_t *mbc, uint16_t addr, uint8_t v)
+{
+	return;
+}
+
+uint8_t mbc_get(mbc_t *mbc, uint16_t addr)
+{
+	switch (mbc->ines->flags6 >> 4)
+	{
+		case 0:
+			return mmc0_get(mbc, addr);
+		default:
+			return 0;
+	}
+}
+
 void mbc_set(mbc_t *mbc, uint16_t addr, uint8_t v)
 {
-	if (addr < 0x6000)
+	switch (mbc->ines->flags6 >> 4)
 	{
-		/* XXX cartridge expansion */
-		return;
+		case 0:
+			mmc0_set(mbc, addr, v);
+			return;
+		default:
+			return;
 	}
-	if (addr < 0x8000)
-	{
-		/* XXX cartridge SRAM */
-		return;
-	}
-	/* XXX cartridge PRG-ROM */
 }

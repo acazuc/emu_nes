@@ -11,7 +11,14 @@ cpu_t *cpu_new(mem_t *mem)
 	if (!cpu)
 		return NULL;
 	cpu->mem = mem;
-	cpu->regs.pc = 0x8000;
+#if 1
+	cpu->reset = 1;
+#endif
+	cpu->regs.p = 0x34;
+	cpu->regs.s = 0xFD;
+#if 0
+	cpu->regs.pc = 0xC000;
+#endif
 	return cpu;
 }
 
@@ -59,7 +66,13 @@ static void cpu_cycle(cpu_t *cpu)
 	}
 	const cpu_instr_t *instr;
 	uint8_t opc;
-	if (cpu->nmi)
+	if (cpu->reset)
+	{
+		instr = &instr_reset;
+		cpu->reset = 0;
+		opc = 0;
+	}
+	else if (cpu->nmi)
 	{
 		instr = &instr_nmi;
 		cpu->nmi = 0;
@@ -77,10 +90,20 @@ static void cpu_cycle(cpu_t *cpu)
 	}
 	char tmp[256];
 	instr->print(cpu, tmp, sizeof(tmp));
+#if 0
 	printf("%-20s [OP=%02" PRIx8 " A=%02" PRIx8 " X=%02" PRIx8 " Y=%02" PRIx8
-	       " S=%02" PRIx8 " PC=%04" PRIx16 " P=%02" PRIx8 "]\n",
+	       " S=%02" PRIx8 " PC=%04" PRIx16 " P=%02" PRIx8 " %c%c%c%c%c%c%c]\n",
 	       tmp, opc, cpu->regs.a, cpu->regs.x, cpu->regs.y, cpu->regs.s,
-	       cpu->regs.pc - 1, cpu->regs.p);
+	       (uint16_t)(cpu->regs.pc - 1), cpu->regs.p,
+	       CPU_GET_FLAG_C(cpu) ? 'C' : '-',
+	       CPU_GET_FLAG_Z(cpu) ? 'Z' : '-',
+	       CPU_GET_FLAG_I(cpu) ? 'I' : '-',
+	       CPU_GET_FLAG_D(cpu) ? 'D' : '-',
+	       CPU_GET_FLAG_B(cpu) ? 'B' : '-',
+	       CPU_GET_FLAG_V(cpu) ? 'V' : '-',
+	       CPU_GET_FLAG_N(cpu) ? 'N' : '-'
+	       );
+#endif
 	instr->exec(cpu);
 }
 

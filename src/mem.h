@@ -23,6 +23,9 @@ typedef struct mem
 	uint8_t gpu_pattern1[0x1000];
 	uint8_t gpu_names[0x1000];
 	uint8_t gpu_palettes[0x20];
+	uint16_t vram_addr;
+	uint8_t spram_addr;
+	uint8_t vram_ff;
 } mem_t;
 
 mem_t *mem_new(mbc_t *mbc);
