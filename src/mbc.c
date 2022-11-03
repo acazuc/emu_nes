@@ -79,7 +79,31 @@ static uint8_t mmc0_get(mbc_t *mbc, uint16_t addr)
 
 static void mmc0_set(mbc_t *mbc, uint16_t addr, uint8_t v)
 {
-	return;
+}
+
+static uint8_t mmc1_get(mbc_t *mbc, uint16_t addr)
+{
+	if (addr < 0x6000)
+		return 0;
+	if (addr < 0x8000)
+		return 0; /* XXX PRG RAM */
+	if (addr < 0xC000)
+	{
+		/* XXX bank */
+		addr -= 0x8000;
+		if (addr >= mbc->prg_rom_size)
+			return 0;
+		return mbc->prg_rom_data[addr];
+	}
+	/* XXX bank */
+	addr -= 0xC000;
+	if (addr >= mbc->prg_rom_size)
+		return 0;
+	return mbc->prg_rom_data[addr];
+}
+
+static void mmc1_set(mbc_t *mbc, uint16_t addr, uint8_t v)
+{
 }
 
 uint8_t mbc_get(mbc_t *mbc, uint16_t addr)
@@ -88,6 +112,8 @@ uint8_t mbc_get(mbc_t *mbc, uint16_t addr)
 	{
 		case 0:
 			return mmc0_get(mbc, addr);
+		case 1:
+			return mmc1_get(mbc, addr);
 		default:
 			return 0;
 	}
@@ -99,7 +125,10 @@ void mbc_set(mbc_t *mbc, uint16_t addr, uint8_t v)
 	{
 		case 0:
 			mmc0_set(mbc, addr, v);
-			return;
+			break;
+		case 1:
+			mmc1_set(mbc, addr, v);
+			break;
 		default:
 			return;
 	}

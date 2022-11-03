@@ -13,6 +13,21 @@ static const cpu_instr_t name = \
 	.print = print_##name, \
 }
 
+static uint16_t ind_x_addr(cpu_t *cpu)
+{
+	uint8_t ind = cpu_fetch8(cpu) + cpu->regs.x;
+	return ((uint16_t)mem_get(cpu->mem, (ind + 0) & 0xFF) << 0)
+	     | ((uint16_t)mem_get(cpu->mem, (ind + 1) & 0xFF) << 8);
+}
+
+static uint16_t ind_y_addr(cpu_t *cpu)
+{
+	uint8_t ind = cpu_fetch8(cpu);
+	uint16_t addr = ((uint16_t)mem_get(cpu->mem, (ind + 0) & 0xFF) << 0)
+	              | ((uint16_t)mem_get(cpu->mem, (ind + 1) & 0xFF) << 8);
+	return addr + cpu->regs.y;
+}
+
 static void exec_clc(cpu_t *cpu)
 {
 	CPU_SET_FLAG_C(cpu, 0);
@@ -402,7 +417,7 @@ static void exec_jmp_ind(cpu_t *cpu)
 {
 	uint16_t ind = cpu_fetch16(cpu);
 	uint16_t lo = mem_get(cpu->mem, ind + 0);
-	uint16_t hi = mem_get(cpu->mem, ind + 1);
+	uint16_t hi = mem_get(cpu->mem, (ind & 0xFF00) | ((ind + 1) & 0xFF));
 	cpu->regs.pc = lo | (hi << 8);
 }
 
@@ -520,10 +535,8 @@ CPU_INSTR(nop_ind16_x);
 
 static void exec_lda_ind_x(cpu_t *cpu)
 {
-	uint8_t ind = cpu_fetch8(cpu);
-	uint16_t addr = ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 0) & 0xFF) << 0)
-	              | ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 1) & 0xFF) << 8);
-	cpu->regs.a = mem_get(cpu->mem, addr);
+	uint16_t ind = ind_x_addr(cpu);
+	cpu->regs.a = mem_get(cpu->mem, ind);
 	CPU_SET_FLAG_Z(cpu, !cpu->regs.a);
 	CPU_SET_FLAG_N(cpu, cpu->regs.a & 0x80);
 }
@@ -538,11 +551,8 @@ CPU_INSTR(lda_ind_x);
 
 static void exec_lda_ind_y(cpu_t *cpu)
 {
-	uint8_t ind = cpu_fetch8(cpu);
-	uint16_t addr = ((uint16_t)mem_get(cpu->mem, ind + 0) << 0)
-	              | ((uint16_t)mem_get(cpu->mem, ind + 1) << 8);
-	addr += cpu->regs.y;
-	cpu->regs.a = mem_get(cpu->mem, addr);
+	uint16_t ind = ind_y_addr(cpu);
+	cpu->regs.a = mem_get(cpu->mem, ind);
 	CPU_SET_FLAG_Z(cpu, !cpu->regs.a);
 	CPU_SET_FLAG_N(cpu, cpu->regs.a & 0x80);
 }
@@ -590,10 +600,8 @@ STR_IND8_R(y, x);
 
 static void exec_sta_ind_x(cpu_t *cpu)
 {
-	uint8_t ind = cpu_fetch8(cpu);
-	uint16_t addr = ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 0) & 0xFF) << 0)
-	              | ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 1) & 0xFF) << 8);
-	mem_set(cpu->mem, addr, cpu->regs.a);
+	uint16_t ind = ind_x_addr(cpu);
+	mem_set(cpu->mem, ind, cpu->regs.a);
 }
 
 static void print_sta_ind_x(cpu_t *cpu, char *data, size_t size)
@@ -606,11 +614,8 @@ CPU_INSTR(sta_ind_x);
 
 static void exec_sta_ind_y(cpu_t *cpu)
 {
-	uint8_t ind = cpu_fetch8(cpu);
-	uint16_t addr = ((uint16_t)mem_get(cpu->mem, ind + 0) << 0)
-	              | ((uint16_t)mem_get(cpu->mem, ind + 1) << 8);
-	addr += cpu->regs.y;
-	mem_set(cpu->mem, addr, cpu->regs.a);
+	uint16_t ind = ind_y_addr(cpu);
+	mem_set(cpu->mem, ind, cpu->regs.a);
 }
 
 static void print_sta_ind_y(cpu_t *cpu, char *data, size_t size)
@@ -905,10 +910,8 @@ CPU_INSTR(cmp_ind8_x);
 
 static void exec_cmp_ind_x(cpu_t *cpu)
 {
-	uint8_t ind = cpu_fetch8(cpu);
-	uint16_t addr = ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 0) & 0xFF) << 0)
-	              | ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 1) & 0xFF) << 8);
-	uint8_t v = cpu->regs.a - mem_get(cpu->mem, addr);
+	uint16_t ind = ind_x_addr(cpu);
+	uint8_t v = cpu->regs.a - mem_get(cpu->mem, ind);
 	CPU_SET_FLAG_C(cpu, v <= cpu->regs.a);
 	CPU_SET_FLAG_Z(cpu, !v);
 	CPU_SET_FLAG_N(cpu, v & 0x80);
@@ -924,11 +927,8 @@ CPU_INSTR(cmp_ind_x);
 
 static void exec_cmp_ind_y(cpu_t *cpu)
 {
-	uint8_t ind = cpu_fetch8(cpu);
-	uint16_t addr = ((uint16_t)mem_get(cpu->mem, ind + 0) << 0)
-	              | ((uint16_t)mem_get(cpu->mem, ind + 1) << 8);
-	addr += cpu->regs.y;
-	uint8_t v = cpu->regs.a - mem_get(cpu->mem, addr);
+	uint16_t ind = ind_y_addr(cpu);
+	uint8_t v = cpu->regs.a - mem_get(cpu->mem, ind);
 	CPU_SET_FLAG_C(cpu, v <= cpu->regs.a);
 	CPU_SET_FLAG_Z(cpu, !v);
 	CPU_SET_FLAG_N(cpu, v & 0x80);
@@ -1093,10 +1093,8 @@ static void print_##op##_ind16_y(cpu_t *cpu, char *data, size_t size) \
 CPU_INSTR(op##_ind16_y); \
 static void exec_##op##_ind_x(cpu_t *cpu) \
 { \
-	uint8_t ind = cpu_fetch8(cpu); \
-	uint16_t addr = ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 0) & 0xFF) << 0) \
-	              | ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 1) & 0xFF) << 8); \
-	op(cpu, mem_get(cpu->mem, addr)); \
+	uint16_t ind = ind_x_addr(cpu); \
+	op(cpu, mem_get(cpu->mem, ind)); \
 } \
 static void print_##op##_ind_x(cpu_t *cpu, char *data, size_t size) \
 { \
@@ -1106,11 +1104,8 @@ static void print_##op##_ind_x(cpu_t *cpu, char *data, size_t size) \
 CPU_INSTR(op##_ind_x); \
 static void exec_##op##_ind_y(cpu_t *cpu) \
 { \
-	uint8_t ind = cpu_fetch8(cpu); \
-	uint16_t addr = ((uint16_t)mem_get(cpu->mem, ind + 0) << 0) \
-	              | ((uint16_t)mem_get(cpu->mem, ind + 1) << 8); \
-	addr += cpu->regs.y; \
-	op(cpu, mem_get(cpu->mem, addr)); \
+	uint16_t ind = ind_y_addr(cpu); \
+	op(cpu, mem_get(cpu->mem, ind)); \
 } \
 static void print_##op##_ind_y(cpu_t *cpu, char *data, size_t size) \
 { \
@@ -1184,10 +1179,8 @@ CPU_INSTR(sax_ind16);
 
 static void exec_sax_ind_x(cpu_t *cpu)
 {
-	uint8_t ind = cpu_fetch8(cpu);
-	uint16_t addr = ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 0) & 0xFF) << 0)
-	              | ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 1) & 0xFF) << 8);
-	mem_set(cpu->mem, addr, cpu->regs.a & cpu->regs.x);
+	uint16_t ind = ind_x_addr(cpu);
+	mem_set(cpu->mem, ind, cpu->regs.a & cpu->regs.x);
 }
 
 static void print_sax_ind_x(cpu_t *cpu, char *data, size_t size)
@@ -1285,10 +1278,8 @@ CPU_INSTR(lax_ind16_y);
 
 static void exec_lax_ind_x(cpu_t *cpu)
 {
-	uint8_t ind = cpu_fetch8(cpu);
-	uint16_t addr = ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 0) & 0xFF) << 0)
-	              | ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 1) & 0xFF) << 8);
-	cpu->regs.a = mem_get(cpu->mem, addr);
+	uint16_t ind = ind_x_addr(cpu);
+	cpu->regs.a = mem_get(cpu->mem, ind);
 	cpu->regs.x = cpu->regs.a;
 	CPU_SET_FLAG_Z(cpu, !cpu->regs.x);
 	CPU_SET_FLAG_N(cpu, cpu->regs.x & 0x80);
@@ -1304,11 +1295,8 @@ CPU_INSTR(lax_ind_x);
 
 static void exec_lax_ind_y(cpu_t *cpu)
 {
-	uint8_t ind = cpu_fetch8(cpu);
-	uint16_t addr = ((uint16_t)mem_get(cpu->mem, ind + 0) << 0)
-	              | ((uint16_t)mem_get(cpu->mem, ind + 1) << 8);
-	addr += cpu->regs.y;
-	cpu->regs.a = mem_get(cpu->mem, addr);
+	uint16_t ind = ind_y_addr(cpu);
+	cpu->regs.a = mem_get(cpu->mem, ind);
 	cpu->regs.x = cpu->regs.a;
 	CPU_SET_FLAG_Z(cpu, !cpu->regs.x);
 	CPU_SET_FLAG_N(cpu, cpu->regs.x & 0x80);
@@ -1440,10 +1428,8 @@ static void print_##name##_ind16_y(cpu_t *cpu, char *data, size_t size) \
 CPU_INSTR(name##_ind16_y); \
 static void exec_##name##_ind_x(cpu_t *cpu) \
 { \
-	uint8_t ind = cpu_fetch8(cpu); \
-	uint16_t addr = ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 0) & 0xFF) << 0) \
-	              | ((uint16_t)mem_get(cpu->mem, (ind + cpu->regs.x + 1) & 0xFF) << 8); \
-	mem_set(cpu->mem, addr, name(cpu, mem_get(cpu->mem, addr))); \
+	uint16_t ind = ind_x_addr(cpu); \
+	mem_set(cpu->mem, ind, name(cpu, mem_get(cpu->mem, ind))); \
 } \
 static void print_##name##_ind_x(cpu_t *cpu, char *data, size_t size) \
 { \
@@ -1453,11 +1439,8 @@ static void print_##name##_ind_x(cpu_t *cpu, char *data, size_t size) \
 CPU_INSTR(name##_ind_x); \
 static void exec_##name##_ind_y(cpu_t *cpu) \
 { \
-	uint8_t ind = cpu_fetch8(cpu); \
-	uint16_t addr = ((uint16_t)mem_get(cpu->mem, ind + 0) << 0) \
-	              | ((uint16_t)mem_get(cpu->mem, ind + 1) << 8); \
-	addr += cpu->regs.y; \
-	mem_set(cpu->mem, addr, name(cpu, mem_get(cpu->mem, addr))); \
+	uint16_t ind = ind_y_addr(cpu); \
+	mem_set(cpu->mem, ind, name(cpu, mem_get(cpu->mem, ind))); \
 } \
 static void print_##name##_ind_y(cpu_t *cpu, char *data, size_t size) \
 { \

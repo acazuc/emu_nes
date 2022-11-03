@@ -130,8 +130,10 @@ uint8_t mem_gpu_get(mem_t *mem, uint16_t addr)
 	switch (addr >> 12)
 	{
 		case 0x0:
+			/* XXX to mbc */
 			return mem->gpu_pattern0[addr];
 		case 0x1:
+			/* XXX to mbc */
 			return mem->gpu_pattern1[addr - 0x1000];
 		case 0x2:
 			return mem->gpu_names[addr - 0x2000];
@@ -153,9 +155,11 @@ void mem_gpu_set(mem_t *mem, uint16_t addr, uint8_t v)
 	switch (addr >> 12)
 	{
 		case 0x0:
+			/* XXX to mbc */
 			mem->gpu_pattern0[addr] = v;
 			return;
 		case 0x1:
+			/* XXX to mbc */
 			mem->gpu_pattern1[addr - 0x1000] = v;
 			return;
 		case 0x2:
