@@ -19,8 +19,6 @@ typedef struct mem
 	mbc_t *mbc;
 	uint8_t gpu_regs[7];
 	uint8_t wram[0x800];
-	uint8_t gpu_pattern0[0x1000];
-	uint8_t gpu_pattern1[0x1000];
 	uint8_t gpu_names[0x1000];
 	uint8_t gpu_palettes[0x20];
 	uint16_t vram_addr;

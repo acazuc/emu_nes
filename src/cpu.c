@@ -90,7 +90,7 @@ static void cpu_cycle(cpu_t *cpu)
 	}
 	char tmp[256];
 	instr->print(cpu, tmp, sizeof(tmp));
-#if 0
+#if 1
 	printf("%-20s [OP=%02" PRIx8 " A=%02" PRIx8 " X=%02" PRIx8 " Y=%02" PRIx8
 	       " S=%02" PRIx8 " PC=%04" PRIx16 " P=%02" PRIx8 " %c%c%c%c%c%c%c]\n",
 	       tmp, opc, cpu->regs.a, cpu->regs.x, cpu->regs.y, cpu->regs.s,

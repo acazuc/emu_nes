@@ -22,12 +22,12 @@ void mem_del(mem_t *mem)
 
 uint8_t mem_get(mem_t *mem, uint16_t addr)
 {
+#if 0
+	printf("get [0x%04" PRIx16 "]\n", addr);
+#endif
 	if (addr < 0x2000)
 	{
 		addr &= 0x7FF;
-#if 0
-		printf("get wram[0x%04" PRIx16 "] = %02" PRIx8 "\n", addr, mem->wram[addr]);
-#endif
 		return mem->wram[addr];
 	}
 	if (addr < 0x4000)
@@ -65,12 +65,12 @@ uint8_t mem_get(mem_t *mem, uint16_t addr)
 
 void mem_set(mem_t *mem, uint16_t addr, uint8_t v)
 {
+#if 1
+		printf("set [0x%04" PRIx16 "] = %02" PRIx8 "\n", addr, v);
+#endif
 	if (addr < 0x2000)
 	{
 		addr &= 0x7FF;
-#if 0
-		printf("set wram[0x%04" PRIx16 "] = %02" PRIx8 "\n", addr, v);
-#endif
 		mem->wram[addr] = v;
 		return;
 	}
@@ -94,7 +94,7 @@ void mem_set(mem_t *mem, uint16_t addr, uint8_t v)
 				mem->spram_addr++;
 				return;
 			case 0x6:
-#if 1
+#if 0
 				printf("writing VRAM addr %02" PRIx8 " (%d)\n", v, mem->vram_ff);
 #endif
 				if (mem->vram_ff)
@@ -130,15 +130,12 @@ uint8_t mem_gpu_get(mem_t *mem, uint16_t addr)
 	switch (addr >> 12)
 	{
 		case 0x0:
-			/* XXX to mbc */
-			return mem->gpu_pattern0[addr];
 		case 0x1:
-			/* XXX to mbc */
-			return mem->gpu_pattern1[addr - 0x1000];
+			return mbc_gpu_get(mem->mbc, addr);
 		case 0x2:
 			return mem->gpu_names[addr - 0x2000];
 		case 0x3:
-			if (addr < 0x3EFF)
+			if (addr < 0x3F00)
 				return mem->gpu_names[addr - 0x3000];
 			return mem->gpu_palettes[(addr - 0x3F00) & 0x1F];
 		default:
@@ -155,22 +152,18 @@ void mem_gpu_set(mem_t *mem, uint16_t addr, uint8_t v)
 	switch (addr >> 12)
 	{
 		case 0x0:
-			/* XXX to mbc */
-			mem->gpu_pattern0[addr] = v;
-			return;
 		case 0x1:
-			/* XXX to mbc */
-			mem->gpu_pattern1[addr - 0x1000] = v;
-			return;
+			mbc_gpu_set(mem->mbc, addr, v);
+			break;
 		case 0x2:
 			mem->gpu_names[addr - 0x2000] = v;
-			return;
+			break;
 		case 0x3:
 			if (addr < 0x3EFF)
 				mem->gpu_names[addr - 0x3000] = v;
 			else
 				mem->gpu_palettes[(addr - 0x3F00) & 0x1F] = v;
-			return;
+			break;
 		default:
 			printf("set unknown gpu memory %04" PRIx16 " = %02" PRIx8 "\n",
 			       addr, v);

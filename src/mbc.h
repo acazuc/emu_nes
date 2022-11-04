@@ -39,4 +39,7 @@ void mbc_del(mbc_t *mbc);
 uint8_t mbc_get(mbc_t *mbc, uint16_t addr);
 void mbc_set(mbc_t *mbc, uint16_t addr, uint8_t v);
 
+uint8_t mbc_gpu_get(mbc_t *mbc, uint16_t addr);
+void mbc_gpu_set(mbc_t *mbc, uint16_t addr, uint8_t v);
+
 #endif
